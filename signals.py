@@ -249,7 +249,7 @@ def updateValues():
             signals[i].red -= 1
 
 
-def step_vehicles(screen):
+def step_vehicles(screen, simulation):
     for vehicle in simulation:
         screen.blit(vehicle.image, [vehicle.x, vehicle.y])
         vehicle.move()
@@ -283,3 +283,9 @@ class Main:
     # )  # initialization
     # thread1.daemon = True
     # thread1.start()
+    
+    # # Loading signal images and font
+    # redSignal = pygame.image.load("images/signals/red.png")
+    # yellowSignal = pygame.image.load("images/signals/yellow.png")
+    # greenSignal = pygame.image.load("images/signals/green.png")
+    # font = pygame.font.Font(None, 30)
