@@ -4,113 +4,28 @@ import threading
 import pygame
 import sys
 import gym
+import numpy as np
 
-from pygame.sprite import Sprite, Group, AbstractGroup
+from pygame.sprite import Sprite, Group
 from typing import Union, Sequence
-from spritesheet import SpriteSheet
 
-
-class Pedestrian(Sprite):
-    def __init__(self, x, y, direction, *groups: AbstractGroup) -> None:
-        super().__init__(*groups)
-
-        self.speed = 0.5
-        self.direction = direction
-        path = "images/bkspr01.png"
-        self.sheet = SpriteSheet(path)
-        self.image = self.sheet.image_at((0, 0, 50, 50))
-        print(self.sheet, self.image)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-
-    def move(self):
-        if self.direction == "right":
-            self.rect.x += self.speed
-        elif self.direction == "down":
-            self.rect.y += self.speed
-        elif self.direction == "left":
-            self.rect.x -= self.speed
-        elif self.direction == "up":
-            self.rect.y -= self.speed
-
-
-class KeyboardPedestrian(Pedestrian):
-    def __init__(self, x, y, lane, direction, *groups: AbstractGroup) -> None:
-        super().__init__(x, y, lane, direction, *groups)
-
-
-class Vehicle(Sprite):
-    def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
-        Sprite.__init__(*groups)
-
-        speeds = {
-            "car": 2.25,
-            "bus": 1.8,
-            "truck": 1.8,
-            "bike": 2.5,
-        }  # average speeds of vehicles
-
-        self.lane = lane
-        self.vehicleClass = vehicleClass
-        self.speed = speeds[vehicleClass]
-        # self.direction_number = direction_number
-        self.direction = direction
-        path = "images/" + direction + "/" + vehicleClass + ".png"
-        self.image = pygame.image.load(path)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-
-    def render(self, screen):
-        screen.blit(self.image, (self.x, self.y))
-
-    def move(self):
-        if self.direction == "right":
-            self.rect.x += self.speed  # move the vehicle
-        elif self.direction == "down":
-            self.rect.y += self.speed
-        elif self.direction == "left":
-            self.rect.x -= self.speed
-        elif self.direction == "up":
-            self.rect.y -= self.speed
-
-
-class RLVehicle(Vehicle):
-    def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
-        super().__init__(x, y, lane, vehicleClass, direction, *groups)
-        # self.crossed = 1
-
-    def move(self):
-        return super().move()
-
-
-class TrafficVehicle(Vehicle):
-    def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
-        super().__init__(x, y, lane, vehicleClass, direction, *groups)
-
-    # def overtake(self, group):
-    # if lane < 1
-    # pygame.sprite.spritecollide(self, group, False)
-
-
-class Road(Sprite):
-    def __init__(
-        self, center_x, center_y, width, height, *groups: AbstractGroup
-    ) -> None:
-        super().__init__(*groups)
+from customsprites import Vehicle, RLVehicle, Pedestrian, KeyboardPedestrian  # , Road
 
 
 class TrafficSim(gym.Env):
     def __init__(
         self,
-        sim_area=(1400, 800),
+        sim_area,
+        *controllable_sprites: Union[Sprite, Sequence[Sprite]],
         headless=False,
-        *vehicle_sprites: Union[Sprite, Sequence[Sprite]]
+        traffic=False,
     ) -> None:
         super().__init__()
         # whether to render or not
         self.headless = headless
+
+        # this varible structure allows for sim_area =/= screen_size so events on edges
+        # and spawn are not displayed as all display updates use screen_size
         self.screen_size = sim_area
         self.sim_area_x = sim_area[0]
         self.sim_area_y = sim_area[1]
@@ -119,7 +34,7 @@ class TrafficSim(gym.Env):
         self.pedestrians = Group()
         self.roads = Group()
 
-        for sprite in [*vehicle_sprites]:
+        for sprite in [*controllable_sprites]:
             if isinstance(sprite, RLVehicle):
                 self.vehicles.add(sprite)
             elif isinstance(sprite, KeyboardPedestrian):
@@ -127,10 +42,10 @@ class TrafficSim(gym.Env):
             else:
                 raise (
                     TypeError,
-                    "Only controllable Vehicles or Pedestrians can be passed in",
+                    "Only controllable Vehicles or Pedestrians can be passed into environment",
                 )
 
-        print(self.pedestrians, self.vehicles)
+        self.generateRoads()
 
         if not self.headless:
             pygame.init()
@@ -144,23 +59,24 @@ class TrafficSim(gym.Env):
         # Gap between vehicles
         # movingGap = 15  # moving gap
         # self.spacings = {0: -movingGap, 1: -movingGap, 2: movingGap, 3: movingGap}
-
-        # background thread to generate traffic
-        thread2 = threading.Thread(
-            name="generateTraffic", target=self.generateTraffic, args=()
-        )
-        thread2.daemon = True
-        thread2.start()
+        if traffic:
+            # background thread to generate traffic
+            thread2 = threading.Thread(
+                name="generateTraffic", target=self.generateTraffic, args=()
+            )
+            thread2.daemon = True
+            thread2.start()
 
     def generateBackground(self):
         # Setting background image and scaling to window size
         bkgrd = pygame.Surface(self.screen_size)
-        width_divisor, height_divisor = 20, 20
+        width_divisor, height_divisor = 2, 2
         tile_width, tile_height = (
             self.screen_size[0] / width_divisor,
             self.screen_size[1] / height_divisor,
         )
-        bkgrd_img = pygame.image.load("images/grass/ground_grass_gen_05.png")
+        bkgrd_img = pygame.image.load("images/grass/ground_grass_gen_02.png").convert()
+        # bkgrd = pygame.transform.scale(bkgrd_img, (self.screen_size))
         bkgrd_tile = pygame.transform.scale(bkgrd_img, (tile_width, tile_height))
         for i in range(width_divisor):
             for j in range(height_divisor):
@@ -173,49 +89,87 @@ class TrafficSim(gym.Env):
         return bkgrd
 
     def generateRoads(self):
-        bkgrd_img = pygame.image.load("images/grass/ground_grass_gen_05.png")
+        # fairly ineffecient TODO: refactor to road class for generality
+
+        horizontal_road = Sprite(self.roads)
+        image_tile = pygame.transform.scale(
+            pygame.image.load("images/roads/roadEW.tga"), (100, 100)
+        )
+        image_rect = image_tile.get_rect()
+        surf = pygame.Surface((self.sim_area_x, image_rect.h))
+        for t in range(np.floor(self.sim_area_x / image_rect.h).astype(int) + 1):
+            surf.blit(image_tile, (t * image_rect.w, 0))
+
+        horizontal_road.image = surf
+        horizontal_road.rect = horizontal_road.image.get_rect()
+        horizontal_road.rect.midleft = (0, self.sim_area_y / 2)
+
+        vertical_path = Sprite(self.roads)
+        image = pygame.transform.scale(
+            pygame.image.load("images/roads/roadPLAZA.tga"), (100, 100)
+        )
+        image_tile = pygame.Surface((50, 50))
+        image_tile.blit(image, (0, 0), image_tile.get_rect())
+        image_rect = image_tile.get_rect()
+        surf = pygame.Surface((image_rect.w, self.sim_area_y))
+        for t in range(np.floor(self.sim_area_y / image_rect.h).astype(int) + 1):
+            surf.blit(image_tile, (0, t * image_rect.h))
+
+        vertical_path.image = surf
+        vertical_path.rect = vertical_path.image.get_rect()
+        vertical_path.rect.midtop = (self.sim_area_x / 2, 0)
+
+        self.crossing = Sprite(self.roads)
+        self.crossing.image = pygame.transform.scale(
+            pygame.image.load("images/roads/roadNEWS.tga"), (100, 100)
+        )
+        self.crossing.rect = self.crossing.image.get_rect()
+        self.crossing.rect.center = ((self.sim_area_x / 2), (self.sim_area_y / 2))
 
     # Generating vehicles in the simulation
     def generateTraffic(self):
-        XMAX = self.sim_area_x
-        YMAX = self.sim_area_y
         # Coordinates of start positions
         x = {
             "right": [0, 0, 0],
-            "down": [(XMAX / 2) + 60, (XMAX / 2) + 30, (XMAX / 2)],
-            "left": [XMAX, XMAX, XMAX],
+            "down": [
+                (self.sim_area_x / 2),
+                (self.sim_area_x / 2),
+                (self.sim_area_x / 2),
+            ],
+            "left": [self.sim_area_x, self.sim_area_x, self.sim_area_x],
             "up": [
-                (XMAX / 2) - 110,
-                (XMAX / 2) - 80,
-                (XMAX / 2) - 50,
+                (self.sim_area_x / 2),
+                (self.sim_area_x / 2),
+                (self.sim_area_x / 2),
             ],
         }
         y = {
             "right": [
-                (YMAX / 2) - 60,
-                (YMAX / 2) - 30,
-                (YMAX / 2),
+                (self.sim_area_y / 2),
+                (self.sim_area_y / 2),
+                (self.sim_area_y / 2),
             ],
             "down": [0, 0, 0],
             "left": [
-                (YMAX / 2) + 90,
-                (YMAX / 2) + 60,
-                (YMAX / 2) + 30,
+                (self.sim_area_y / 2),
+                (self.sim_area_y / 2),
+                (self.sim_area_y / 2),
             ],
-            "up": [YMAX, YMAX, YMAX],
+            "up": [self.sim_area_y, self.sim_area_y, self.sim_area_y],
         }
 
         while True:
 
             vehicle_type = random.randint(0, 3)
-            lane_number = random.randint(0, 2)
+            # lane_number = random.randint(0, 2)
+            lane_number = 2
 
             if random.uniform(0, 1) < 0.5:
                 direction_number = 0
             else:
                 direction_number = 2
 
-            if random.uniform(0, 1) < 0.8:
+            if random.uniform(0, 1) < 0.7:
                 direction = self.directionNumbers[direction_number]
                 Vehicle(
                     x[direction][lane_number],
@@ -243,7 +197,7 @@ class TrafficSim(gym.Env):
         old_y = vehicle.rect.y
 
         # update vehicle position
-        vehicle.move()
+        vehicle.update()
 
         # remove vehicles once they drive offscreen
         if not (
@@ -265,10 +219,10 @@ class TrafficSim(gym.Env):
             # destroy them if collision at spawn, as this logic only works
             # if the collision is strictly caused by this vehicles updated position
             if (
-                old_x == 0.0
-                or old_y == 0.0
-                or old_x == self.sim_area_x
-                or old_y == self.sim_area_y
+                old_x <= 0.0
+                or old_y <= 0.0
+                or old_x >= self.sim_area_x
+                or old_y >= self.sim_area_y
             ):
                 self.vehicles.remove(vehicle)
             # move them back otherwise
@@ -282,7 +236,7 @@ class TrafficSim(gym.Env):
         old_y = ped.rect.y
 
         # update vehicle position
-        ped.move()
+        ped.update()
 
         # remove vehicles once they drive offscreen
         if not (-ped.rect.width <= ped.rect.x <= self.sim_area_x + ped.rect.width):
@@ -296,10 +250,10 @@ class TrafficSim(gym.Env):
             # destroy them if collision at spawn, as this logic only works
             # if the collision is strictly caused by this vehicles updated position
             if (
-                old_x == 0.0
-                or old_y == 0.0
-                or old_x == self.sim_area_x
-                or old_y == self.sim_area_y
+                old_x <= 0.0
+                or old_y <= 0.0
+                or old_x >= self.sim_area_x
+                or old_y >= self.sim_area_y
             ):
                 self.pedestrians.remove(ped)
             # move them back otherwise
@@ -310,6 +264,8 @@ class TrafficSim(gym.Env):
     def step(self):
         for vehicle in self.vehicles:
             self.step_vehicle(vehicle)
+        for ped in self.pedestrians:
+            self.step_pedestrian(ped)
 
         if not self.headless:
             self.screen.blit(
@@ -323,27 +279,37 @@ class TrafficSim(gym.Env):
         self.pedestrians.draw(self.screen)
 
     def run(self):
+        # count = 0
         while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    sys.exit()
-
             # advance sim by one timestep
             self.step()
+            # count += 1
+            # if count % 100000 == 0:
+            #     print(count)
 
-            # display the vehicles
+            # display the simulation
             if not self.headless:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        sys.exit()
+
                 pygame.display.update()
+                # hacky way to have ~60 FPS TODO: implentment properly
+                time.sleep(0.016)
 
 
 class Main:
+    window = (720, 576)
+    simulation = TrafficSim(
+        window,
+        RLVehicle(0, window[1] / 2, 2, "car", "right"),
+        headless=False,
+        traffic=True,
+    )
 
-    simulation = TrafficSim(sim_area=(1280, 720), headless=False)
+    # RL agent
+    # RL_Vehicle(window[0]/2, window[1], 2, "car", "up")
 
-    # add RL agent
-    # simulation.add(RL_Vehicle(1, "bike", 3, "up"))
-
-    # thread this? put methods in classes to thread this and the one above?
     simulation.run()
 
 
