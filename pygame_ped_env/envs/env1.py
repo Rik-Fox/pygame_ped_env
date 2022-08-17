@@ -152,12 +152,29 @@ class RLCrossingSim(gym.Env):
         horizontal_road.rect.midleft = (0, self.sim_area_y / 2)
 
     def get_reward(self, agent: RLVehicle):
+        # place holder function for social rewards
+        return self.get_primitive_reward(agent)
 
+    def get_primitive_reward(self, agent: RLVehicle):
+        # agent = self.vehicle.sprite
         # if run over pedestrian, give massive reward reduction and end episode
-        if pygame.sprite.spritecollide(self.vehicle.sprite, self.pedestrian, True):
-            return -1, True
-        else:
-            return agent.sprite.moved / agent.sprite.speed, False
+        done = False
+        c = 1
+        if pygame.sprite.spritecollide(agent, self.pedestrian, True):
+            c = 0
+            done = True
+
+        # distance from end point
+        d_obj = np.abs(agent.rect.center - agent.objective)
+        d_theta = np.arctan(d_obj[1] / d_obj[2])
+        # movement vector
+        delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
+        delta_theta = np.arctan(agent.sprite.moved[1] / agent.sprite.moved[0])
+
+        # primitive reward function
+        rwd = (delta_theta / d_theta) * (delta_rho / agent.sprite.speed) * ((2 * c) + 1)
+
+        return rwd, done
 
     def step(self, action):
         # print(action)

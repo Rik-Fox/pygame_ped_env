@@ -9,11 +9,21 @@ import numpy as np
 
 class RLVehicle(Vehicle):
     # class for hooking in RL algorithms
-    def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
-        super().__init__(x, y, lane, vehicleClass, direction, *groups)
+    def __init__(self, start, end, vehicleClass, direction, *groups: AbstractGroup):
+        super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
 
         # hook for RL algo
         self.model = None
+        self.moved = np.array([0, 0])
+        self.objective = np.array(end)
+        # if direction == "right":
+        #     self.objective = []
+        # elif direction == "down":
+        #     self.rect.y += self.speed
+        # elif direction == "left":
+        #     self.rect.x -= self.speed
+        # elif direction == "up":
+        #     self.rect.y -= self.speed
 
     def act(self, action):
         x, y = self.rect.x, self.rect.y
@@ -27,9 +37,10 @@ class RLVehicle(Vehicle):
         elif action == "up":
             self.rect.y -= self.speed
 
-        dx = np.abs(self.rect.x - x)
-        dy = np.abs(self.rect.y - y)
-        self.moved = np.clip(np.sqrt(dx**2 + dy**2), 0, self.speed)
+        dx = self.rect.x - x
+        dy = self.rect.y - y
+        # self.moved = np.clip(np.sqrt(dx**2 + dy**2), 0, self.speed)
+        self.moved = [dx, dy]
 
     def update(self):
         pass
