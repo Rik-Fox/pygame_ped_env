@@ -163,6 +163,8 @@ class RLCrossingSim(gym.Env):
         if pygame.sprite.spritecollide(agent, self.pedestrian, True):
             c = 0
             done = True
+        elif not pygame.sprite.spritecollide(agent, self.roads, False):
+            c = 0.5
 
         # distance from end point
         d_obj = np.abs(agent.rect.center - agent.objective)
@@ -172,7 +174,12 @@ class RLCrossingSim(gym.Env):
         delta_theta = np.arctan(agent.sprite.moved[1] / agent.sprite.moved[0])
 
         # primitive reward function
-        rwd = (delta_theta / d_theta) * (delta_rho / agent.sprite.speed) * ((2 * c) + 1)
+        heading_rwd = np.abs(np.abs(delta_theta - d_theta) - np.pi) / np.pi
+        speed_rwd = delta_rho / agent.sprite.speed
+        # other terms strictly +ve, obstacle reward is -ve for collide, 0 for off road, +ve otherwise
+        # meaning only driving on road is +ve rewarded and hitting peds is -ve, off road better than colliding
+        obstacle_rwd = (2 * c) - 1
+        rwd = heading_rwd * speed_rwd * obstacle_rwd
 
         return rwd, done
 

@@ -14,6 +14,7 @@ class RLVehicle(Vehicle):
 
         # hook for RL algo
         self.model = None
+
         self.moved = np.array([0, 0])
         self.objective = np.array(end)
         # if direction == "right":
