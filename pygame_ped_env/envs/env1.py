@@ -60,7 +60,7 @@ class RLCrossingSim(gym.Env):
                 self.init_sprites[sprite] = sprite.rect.copy()
             else:
                 raise TypeError(
-                    "Only one vehicle and one pedestrian can be passed into environment",
+                    "Only one vehicle and one pedestrian can be passed into this environment",
                 )
 
         self.roads = Group()
@@ -167,7 +167,7 @@ class RLCrossingSim(gym.Env):
             collide_rwd = -1
 
         # distance from end point
-        d_obj = agent.dist_to_objective()
+        d_obj = agent.sprite.dist_to_objective()
         if (
             d_obj == np.zeros(2)
         ).all():  # if we have reached the destination, give max rwd
@@ -215,7 +215,7 @@ class RLCrossingSim(gym.Env):
             ped_rect = pygame.Rect(0, 0, 0, 0)
             # import pdb
             # pdb.set_trace()
-
+        print(ped_rect)
         if not self.headless:
             self.render()
 
@@ -230,21 +230,21 @@ class RLCrossingSim(gym.Env):
         # remove vehicles once they drive offscreen and finish episode
         if not self.done:
             if not (0 <= self.vehicle.sprite.rect.centery <= self.sim_area_y):
-                self.vehicle.remove(self.vehicle.sprite)
-                self.done = True
                 # if not roughly at destination then punish
                 if not (
                     self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
                 ).all():
                     rwd -= 1000
+                self.vehicle.remove(self.vehicle.sprite)
+                self.done = True
             elif not (0 <= self.vehicle.sprite.rect.centerx <= self.sim_area_x):
-                self.vehicle.remove(self.vehicle.sprite)
-                self.done = True
                 # if not roughly at destination then punish
                 if not (
                     self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
                 ).all():
                     rwd -= 1000
+                self.vehicle.remove(self.vehicle.sprite)
+                self.done = True
 
         return obs, rwd, self.done, {}
 
@@ -276,8 +276,8 @@ class RLCrossingSim(gym.Env):
                 sprite.rect = self.init_sprites[sprite].copy()
                 # slight noise in pedestrian start position
                 sprite.rect.x, sprite.rect.y = (
-                    np.random.rand() * 5,
-                    np.random.rand() * 5,
+                    sprite.rect.x + (np.random.rand() * 4) - 2,
+                    sprite.rect.y + (np.random.rand() * 4) - 2,
                 )
                 self.pedestrian.add(sprite)
             else:
