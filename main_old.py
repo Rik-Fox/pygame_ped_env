@@ -1,6 +1,4 @@
 # from env import TrafficSim
-import time
-import os
 from pygame_ped_env.agents import (
     RLVehicle,
     KeyboardPedestrian,
@@ -8,49 +6,29 @@ from pygame_ped_env.agents import (
 )  # , Road
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.env_util import make_vec_env
 import gym
 
-from custom_logging import CustomTrackingCallback
 
 class Main:
-
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"logs")
-    # print("log_path => ",str(log_path))
 
     window = (720, 576)
 
     agent = RLVehicle([0, window[1] / 2], [window[0], window[1] / 2], "car", "right")
 
-    # env = Monitor(
-    #     gym.make(
-    #         "pygame_ped_env:ped_env-v1",
-    #         sim_area=window,
-    #         controllable_sprites=[
-    #             agent,
-    #             # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
-    #             RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-    #         ],
-    #         headless=True,
-    #         seed=1234,
-    #     ),
-    #     log_path,
-    # )
-    env = make_vec_env(
-        "pygame_ped_env:ped_env-v1",
-        10,
-        env_kwargs={
-            "sim_area": window,
-            "controllable_sprites": [
+    env = Monitor(
+        gym.make(
+            "pygame_ped_env:ped_env-v1",
+            sim_area=window,
+            controllable_sprites=[
                 agent,
+                # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
                 RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
             ],
-            "headless": True,
-        },
-        seed=1234,
-        monitor_dir=log_path,
+            headless=True,
+            seed=1234,
+        ),
+        "../logs/monitor.csv",
     )
-
 
     n_episodes = 1e6
     env.reset()
@@ -84,7 +62,7 @@ class Main:
     #     _init_setup_model: bool = True,
     # )
 
-    agent.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
+    agent.model = DQN("MlpPolicy", env, verbose=1, tensorboard_log="./logs/")
 
     # def learn(
     #     self,
@@ -100,14 +78,8 @@ class Main:
     # )
 
     agent.model.learn(
-        total_timesteps=int(25 * n_episodes),
+        total_timesteps=int(250 * n_episodes),
         tb_log_name="DQN_testing",
-        callback=CustomTrackingCallback(
-            check_freq=1000,
-            monitor_dir=log_path,
-            start_time=time.time(),
-            verbose=1,
-        )
     )
 
     # for ep in range(n_episodes):
@@ -117,7 +89,7 @@ class Main:
     #         obs, reward, done, info = env.step(agent.model.predict(obs))
     # env.run()
 
-    agent.model.save("./logs/test_model")
+    agent.model.save("../logs/test_model")
 
 
 if __name__ == "__main__":
