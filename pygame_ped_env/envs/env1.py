@@ -156,8 +156,8 @@ class RLCrossingSim(gym.Env):
         return self.get_primitive_reward(agent)
 
     def get_primitive_reward(self, agent: RLVehicle):
-        done=False
-        collide_rwd = 0 # 0 no collision, -1 offroad, -2 hit pedestrian
+        done = False
+        collide_rwd = 0  # 0 no collision, -1 offroad, -2 hit pedestrian
 
         # if run over pedestrian, give reward reduction and end episode
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
@@ -167,18 +167,24 @@ class RLCrossingSim(gym.Env):
             collide_rwd = -1
 
         # distance from end point
-        d_obj = np.abs(agent.sprite.rect.center - agent.sprite.objective)
-        if (d_obj == np.zeros(2)).all(): # if we have reached the destination, give max rwd
+        d_obj = agent.dist_to_objective()
+        if (
+            d_obj == np.zeros(2)
+        ).all():  # if we have reached the destination, give max rwd
             heading_rwd = 0
         else:
             # goal vector angle
-            with np.errstate(divide='ignore'):
-                d_theta = np.arctan(np.divide(d_obj[0],d_obj[1])) # gives nan if at destination
+            with np.errstate(divide="ignore"):
+                d_theta = np.arctan(
+                    np.divide(d_obj[0], d_obj[1])
+                )  # gives nan if at destination
             # movement vector angle
-            with np.errstate(divide='ignore'):
-                delta_theta = np.arctan(np.divide(agent.sprite.moved[1], agent.sprite.moved[0]))
+            with np.errstate(divide="ignore"):
+                delta_theta = np.arctan(
+                    np.divide(agent.sprite.moved[1], agent.sprite.moved[0])
+                )
             # rewarded for having movementvector pointing at goal
-            heading_rwd = -(np.abs(delta_theta - d_theta)/2*np.pi)
+            heading_rwd = -(np.abs(delta_theta - d_theta) / 2 * np.pi)
         # movement vector magnitude
         delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
         # rewarded for going as fast as possible
@@ -191,19 +197,22 @@ class RLCrossingSim(gym.Env):
         rwd = heading_rwd + speed_rwd + collide_rwd
 
         if np.isnan(rwd):
+            print("primitive reward returned NaN")
             import pdb
+
             pdb.set_trace()
 
         return rwd, done
 
     def step(self, action):
-        # print(action)
+        if isinstance(action, np.ndarray):
+            action = action.item()
         self.vehicle.sprite.act(self.directionNumbers[action])
         try:
             self.pedestrian.sprite.update()
-            ped_rect =  self.pedestrian.sprite.rect
+            ped_rect = self.pedestrian.sprite.rect
         except AttributeError:
-            ped_rect = pygame.Rect(0,0, 0, 0)
+            ped_rect = pygame.Rect(0, 0, 0, 0)
             # import pdb
             # pdb.set_trace()
 
@@ -220,20 +229,22 @@ class RLCrossingSim(gym.Env):
 
         # remove vehicles once they drive offscreen and finish episode
         if not self.done:
-            if not (
-                0
-                <= self.vehicle.sprite.rect.centerx
-                <= self.sim_area_x
-            ):
+            if not (0 <= self.vehicle.sprite.rect.centery <= self.sim_area_y):
                 self.vehicle.remove(self.vehicle.sprite)
                 self.done = True
-            elif not (
-                0
-                <= self.vehicle.sprite.rect.centery
-                <= self.sim_area_y
-            ):
+                # if not roughly at destination then punish
+                if not (
+                    self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
+                ).all():
+                    rwd -= 1000
+            elif not (0 <= self.vehicle.sprite.rect.centerx <= self.sim_area_x):
                 self.vehicle.remove(self.vehicle.sprite)
                 self.done = True
+                # if not roughly at destination then punish
+                if not (
+                    self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
+                ).all():
+                    rwd -= 1000
 
         return obs, rwd, self.done, {}
 
@@ -317,7 +328,4 @@ class RLCrossingSim(gym.Env):
                     if event.type == pygame.QUIT:
                         sys.exit()
 
-                pygame.display.update()
-
-                # hacky way to have ~60 FPS TODO: implentment properly
-                time.sleep(0.016)
+                self.render()

@@ -26,6 +26,9 @@ class RLVehicle(Vehicle):
         # elif direction == "up":
         #     self.rect.y -= self.speed
 
+    def dist_to_objective(self):
+        return np.abs(self.rect.center - self.objective)
+
     def act(self, action):
         x, y = self.rect.x, self.rect.y
 
@@ -122,9 +125,11 @@ class RandomPedestrian(Pedestrian):
                 self.rect.y += 1
             else:
                 r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
-                with np.errstate(divide='ignore'):
-                    theta = np.arctan(np.divide(np.abs(self.rect.y + dy), np.abs(self.rect.x + dx)))
-                
+                with np.errstate(divide="ignore"):
+                    theta = np.arctan(
+                        np.divide(np.abs(self.rect.y + dy), np.abs(self.rect.x + dx))
+                    )
+
                 if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
                     theta = 0
                 self.rect.x = np.round(r * np.cos(theta + epsilon))

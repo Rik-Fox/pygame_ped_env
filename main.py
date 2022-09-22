@@ -13,9 +13,10 @@ import gym
 
 from custom_logging import CustomTrackingCallback
 
+
 class Main:
 
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"logs")
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
     # print("log_path => ",str(log_path))
 
     window = (720, 576)
@@ -50,7 +51,6 @@ class Main:
         seed=1234,
         monitor_dir=log_path,
     )
-
 
     n_episodes = 1e6
     env.reset()
@@ -100,14 +100,14 @@ class Main:
     # )
 
     agent.model.learn(
-        total_timesteps=int(25 * n_episodes),
+        total_timesteps=25,
         tb_log_name="DQN_testing",
         callback=CustomTrackingCallback(
             check_freq=1000,
             monitor_dir=log_path,
             start_time=time.time(),
             verbose=1,
-        )
+        ),
     )
 
     # for ep in range(n_episodes):
@@ -117,7 +117,7 @@ class Main:
     #         obs, reward, done, info = env.step(agent.model.predict(obs))
     # env.run()
 
-    agent.model.save("./logs/test_model")
+    agent.model.save("./logs/test_model", include="env")
 
 
 if __name__ == "__main__":
