@@ -156,38 +156,56 @@ class RLCrossingSim(gym.Env):
         return self.get_primitive_reward(agent)
 
     def get_primitive_reward(self, agent: RLVehicle):
-        # agent = self.vehicle.sprite
-        # if run over pedestrian, give massive reward reduction and end episode
-        done = False
-        c = 1
-        if pygame.sprite.spritecollide(agent, self.pedestrian, True):
-            c = 0
+        done=False
+        collide_rwd = 0 # 0 no collision, -1 offroad, -2 hit pedestrian
+
+        # if run over pedestrian, give reward reduction and end episode
+        if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
+            collide_rwd = -2
             done = True
-        elif not pygame.sprite.spritecollide(agent, self.roads, False):
-            c = 0.5
+        elif not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
+            collide_rwd = -1
 
         # distance from end point
-        d_obj = np.abs(agent.rect.center - agent.objective)
-        d_theta = np.arctan(d_obj[1] / d_obj[2])
-        # movement vector
+        d_obj = np.abs(agent.sprite.rect.center - agent.sprite.objective)
+        if (d_obj == np.zeros(2)).all(): # if we have reached the destination, give max rwd
+            heading_rwd = 0
+        else:
+            # goal vector angle
+            with np.errstate(divide='ignore'):
+                d_theta = np.arctan(np.divide(d_obj[0],d_obj[1])) # gives nan if at destination
+            # movement vector angle
+            with np.errstate(divide='ignore'):
+                delta_theta = np.arctan(np.divide(agent.sprite.moved[1], agent.sprite.moved[0]))
+            # rewarded for having movementvector pointing at goal
+            heading_rwd = -(np.abs(delta_theta - d_theta)/2*np.pi)
+        # movement vector magnitude
         delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
-        delta_theta = np.arctan(agent.sprite.moved[1] / agent.sprite.moved[0])
+        # rewarded for going as fast as possible
+        speed_rwd = (delta_rho / agent.sprite.speed) - 1
 
         # primitive reward function
-        heading_rwd = np.abs(np.abs(delta_theta - d_theta) - np.pi) / np.pi
-        speed_rwd = delta_rho / agent.sprite.speed
         # other terms strictly +ve, obstacle reward is -ve for collide, 0 for off road, +ve otherwise
         # meaning only driving on road is +ve rewarded and hitting peds is -ve, off road better than colliding
-        obstacle_rwd = (2 * c) - 1
-        rwd = heading_rwd * speed_rwd * obstacle_rwd
+
+        rwd = heading_rwd + speed_rwd + collide_rwd
+
+        if np.isnan(rwd):
+            import pdb
+            pdb.set_trace()
 
         return rwd, done
 
     def step(self, action):
         # print(action)
         self.vehicle.sprite.act(self.directionNumbers[action])
-
-        self.pedestrian.sprite.update()
+        try:
+            self.pedestrian.sprite.update()
+            ped_rect =  self.pedestrian.sprite.rect
+        except AttributeError:
+            ped_rect = pygame.Rect(0,0, 0, 0)
+            # import pdb
+            # pdb.set_trace()
 
         if not self.headless:
             self.render()
@@ -195,7 +213,7 @@ class RLCrossingSim(gym.Env):
         obs = np.hstack(
             [
                 [self.vehicle.sprite.rect],
-                [self.pedestrian.sprite.rect],
+                [ped_rect],
             ],
         )
         rwd, self.done = self.get_reward(self.vehicle)
@@ -203,16 +221,16 @@ class RLCrossingSim(gym.Env):
         # remove vehicles once they drive offscreen and finish episode
         if not self.done:
             if not (
-                -self.vehicle.sprite.rect.width
-                <= self.vehicle.sprite.rect.x
-                <= self.sim_area_x + self.vehicle.sprite.rect.width
+                0
+                <= self.vehicle.sprite.rect.centerx
+                <= self.sim_area_x
             ):
                 self.vehicle.remove(self.vehicle.sprite)
                 self.done = True
             elif not (
-                -self.vehicle.sprite.rect.height
-                <= self.vehicle.sprite.rect.y
-                <= self.sim_area_y + self.vehicle.sprite.rect.height
+                0
+                <= self.vehicle.sprite.rect.centery
+                <= self.sim_area_y
             ):
                 self.vehicle.remove(self.vehicle.sprite)
                 self.done = True

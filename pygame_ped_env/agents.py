@@ -115,15 +115,20 @@ class RandomPedestrian(Pedestrian):
         direction = self.get_direction()
 
         def polarRandom(dx, dy):
-
             epsilon = ((np.random.rand() * 2) - 1) / 200
             # epsilon = 0
-
-            r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
-            theta = np.arctan(np.abs(self.rect.y + dy) / np.abs(self.rect.x + dx))
-
-            self.rect.x = np.round(r * np.cos(theta + epsilon))
-            self.rect.y = np.round(r * np.sin(theta + epsilon))
+            if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
+                self.rect.x += 1
+                self.rect.y += 1
+            else:
+                r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
+                with np.errstate(divide='ignore'):
+                    theta = np.arctan(np.divide(np.abs(self.rect.y + dy), np.abs(self.rect.x + dx)))
+                
+                if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
+                    theta = 0
+                self.rect.x = np.round(r * np.cos(theta + epsilon))
+                self.rect.y = np.round(r * np.sin(theta + epsilon))
 
         if direction == "up":
             polarRandom(0, -self.speed)
