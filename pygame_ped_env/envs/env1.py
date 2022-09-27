@@ -161,7 +161,7 @@ class RLCrossingSim(gym.Env):
 
         # if run over pedestrian, give reward reduction and end episode
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
-            collide_rwd = -2
+            collide_rwd = -1000
             done = True
         elif not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
             collide_rwd = -1
@@ -171,24 +171,30 @@ class RLCrossingSim(gym.Env):
         if (
             d_obj == np.zeros(2)
         ).all():  # if we have reached the destination, give max rwd
-            heading_rwd = 0
+            heading_rwd = 1
         else:
-            # goal vector angle
-            with np.errstate(divide="ignore"):
-                d_theta = np.arctan(
-                    np.divide(d_obj[0], d_obj[1])
-                )  # gives nan if at destination
-            # movement vector angle
-            with np.errstate(divide="ignore"):
-                delta_theta = np.arctan(
-                    np.divide(agent.sprite.moved[1], agent.sprite.moved[0])
-                )
-            # rewarded for having movementvector pointing at goal
-            heading_rwd = -(np.abs(delta_theta - d_theta) / 2 * np.pi)
+            obj = agent.sprite.objective
+
+            x_rwd = np.abs(obj[0] - d_obj[0])
+            y_rwd = np.abs(obj[1] - d_obj[1])
+            #inverse distance reward
+            heading_rwd = 1/np.sqrt((x_rwd**2)+(y_rwd**2))
+            # # goal vector angle
+            # with np.errstate(divide="ignore"):
+            #     d_theta = np.arctan(
+            #         np.divide(d_obj[0], d_obj[1])
+            #     )  # gives nan if at destination
+            # # movement vector angle
+            # with np.errstate(divide="ignore"):
+            #     delta_theta = np.arctan(
+            #         np.divide(agent.sprite.moved[1], agent.sprite.moved[0])
+            #     )
+            # # rewarded for having movementvector pointing at goal
+            # heading_rwd = -(np.abs(delta_theta - d_theta) / 2 * np.pi)
         # movement vector magnitude
         delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
         # rewarded for going as fast as possible
-        speed_rwd = (delta_rho / agent.sprite.speed) - 1
+        speed_rwd = (delta_rho / agent.sprite.speed)
 
         # primitive reward function
         # other terms strictly +ve, obstacle reward is -ve for collide, 0 for off road, +ve otherwise
@@ -205,6 +211,7 @@ class RLCrossingSim(gym.Env):
         return rwd, done
 
     def step(self, action):
+        #extract action from array if given as numpy array from sb3
         if isinstance(action, np.ndarray):
             action = action.item()
         self.vehicle.sprite.act(self.directionNumbers[action])
@@ -215,7 +222,7 @@ class RLCrossingSim(gym.Env):
             ped_rect = pygame.Rect(0, 0, 0, 0)
             # import pdb
             # pdb.set_trace()
-        print(ped_rect)
+        
         if not self.headless:
             self.render()
 
