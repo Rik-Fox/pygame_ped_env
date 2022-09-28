@@ -171,34 +171,19 @@ class RLCrossingSim(gym.Env):
         if (
             d_obj == np.zeros(2)
         ).all():  # if we have reached the destination, give max rwd
-            heading_rwd = 1
+            heading_rwd = 0
         else:
-            obj = agent.sprite.objective
-
-            x_rwd = np.abs(obj[0] - d_obj[0])
-            y_rwd = np.abs(obj[1] - d_obj[1])
-            #inverse distance reward
-            heading_rwd = 1/np.sqrt((x_rwd**2)+(y_rwd**2))
-            # # goal vector angle
-            # with np.errstate(divide="ignore"):
-            #     d_theta = np.arctan(
-            #         np.divide(d_obj[0], d_obj[1])
-            #     )  # gives nan if at destination
-            # # movement vector angle
-            # with np.errstate(divide="ignore"):
-            #     delta_theta = np.arctan(
-            #         np.divide(agent.sprite.moved[1], agent.sprite.moved[0])
-            #     )
-            # # rewarded for having movementvector pointing at goal
-            # heading_rwd = -(np.abs(delta_theta - d_theta) / 2 * np.pi)
+            #inverse distance reward, 1/(distance to objective) in [0,1], 
+            # then shift y intercept to make in [-1,0]
+            heading_rwd = (1/np.sqrt((d_obj[0]**2)+(d_obj[1]**2))) - 1
         # movement vector magnitude
         delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
-        # rewarded for going as fast as possible
-        speed_rwd = (delta_rho / agent.sprite.speed)
+        # rewarded for going as fast as possible, speed as fraction of top speed
+        # shifted to be in [-1,0] also
+        speed_rwd = (delta_rho / agent.sprite.speed) - 1
 
         # primitive reward function
-        # other terms strictly +ve, obstacle reward is -ve for collide, 0 for off road, +ve otherwise
-        # meaning only driving on road is +ve rewarded and hitting peds is -ve, off road better than colliding
+        #  terms strictly -ve to avoid inf actions leading to inf rewards
 
         rwd = heading_rwd + speed_rwd + collide_rwd
 
