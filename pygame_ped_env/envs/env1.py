@@ -173,9 +173,9 @@ class RLCrossingSim(gym.Env):
         ).all():  # if we have reached the destination, give max rwd
             heading_rwd = 0
         else:
-            #inverse distance reward, 1/(distance to objective) in [0,1], 
+            # inverse distance reward, 1/(distance to objective) in [0,1],
             # then shift y intercept to make in [-1,0]
-            heading_rwd = (1/np.sqrt((d_obj[0]**2)+(d_obj[1]**2))) - 1
+            heading_rwd = (1 / np.sqrt((d_obj[0] ** 2) + (d_obj[1] ** 2))) - 1
         # movement vector magnitude
         delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
         # rewarded for going as fast as possible, speed as fraction of top speed
@@ -196,7 +196,7 @@ class RLCrossingSim(gym.Env):
         return rwd, done
 
     def step(self, action):
-        #extract action from array if given as numpy array from sb3
+        # extract action from array if given as numpy array from sb3
         if isinstance(action, np.ndarray):
             action = action.item()
         self.vehicle.sprite.act(self.directionNumbers[action])
@@ -207,7 +207,7 @@ class RLCrossingSim(gym.Env):
             ped_rect = pygame.Rect(0, 0, 0, 0)
             # import pdb
             # pdb.set_trace()
-        
+
         if not self.headless:
             self.render()
 
@@ -296,23 +296,11 @@ class RLCrossingSim(gym.Env):
 
     def run(self):
         # count = 0
-        while True:
+        obs = self.reset()
+        done = self.done
+        while not done:
             # advance sim by one timestep
-            self.step()
-            # count += 1
-            # if count % 100000 == 0:
-            #     print(count)
-            # randPed = [
-            #     ped for ped in self.pedestrians if isinstance(ped, RandomPedestrian)
-            # ]
-            # print(randPed)
-            # if len(randPed) < 1:
-            #     RandomPedestrian(
-            #         self.sim_area_x / 2,
-            #         self.sim_area_y * (3 / 4),
-            #         "up",
-            #         self.pedestrians,
-            #     ),
+            obs, _, done, _ = self.step(self.vehicle.sprite.model.predict(obs)[0])
 
             # display the simulation
             if not self.headless:
@@ -321,3 +309,4 @@ class RLCrossingSim(gym.Env):
                         sys.exit()
 
                 self.render()
+        pygame.quit()

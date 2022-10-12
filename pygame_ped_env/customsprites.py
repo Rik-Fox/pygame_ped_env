@@ -9,7 +9,7 @@ from pygame_ped_env.spritesheet import SpriteSheet, SpriteStripAnim
 class Pedestrian(Sprite):
     def __init__(self, x, y, direction, *groups: AbstractGroup) -> None:
 
-        self.speed = 1
+        self.speed = 2
 
         self.init_anim(
             os.path.join(
@@ -85,7 +85,7 @@ class Vehicle(Sprite):
     def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
 
         speeds = {
-            "car": 2.25,
+            "car": 3.25,
             "bus": 1.8,
             "truck": 1.8,
             "bike": 2.5,
