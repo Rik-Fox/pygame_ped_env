@@ -25,6 +25,9 @@ class RLCrossingSim(gym.Env):
         controllable_sprites: Union[None, Sprite, Sequence[Sprite]] = None,
         headless=False,
         seed=1234,
+        speed_coefficient=1.0,
+        position_coefficient=1.0,
+        steering_coefficient=1.0,
     ) -> None:
         assert (
             len(controllable_sprites) == 2
@@ -34,6 +37,11 @@ class RLCrossingSim(gym.Env):
 
         # whether to render or not
         self.headless = headless
+
+        # reward weightings, used to adjust for repsonse data
+        self.speed_coeff = speed_coefficient
+        self.pos_coeff = position_coefficient
+        self.steer_coeff = steering_coefficient
 
         # this varible structure allows for sim_area =/= screen_size so events on edges
         # and spawn are not displayed as all display updates use screen_size
@@ -153,7 +161,21 @@ class RLCrossingSim(gym.Env):
 
     def get_reward(self, agent: RLVehicle):
         # place holder function for social rewards
-        return self.get_primitive_reward(agent)
+        prim_rwd, done = self.get_primitive_reward(agent)
+        if done:
+            return prim_rwd, done
+        else:
+
+            if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
+                collide_rwd = -1
+                # elif not pygame.sprite.spritecollide(agent.sprite, self.roads.lane, False):
+                collide_rwd = -0.5
+
+            # movement vector magnitude
+            delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
+            # rewarded for going as fast as possible, speed as fraction of top speed
+            # shifted to be in [-1,0] also
+            speed_rwd = (delta_rho / agent.sprite.speed) - 1  # self.speed_coeff
 
     def get_primitive_reward(self, agent: RLVehicle):
         done = False
@@ -163,29 +185,34 @@ class RLCrossingSim(gym.Env):
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
             collide_rwd = -1000
             done = True
-        elif not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
-            collide_rwd = -1
 
         # distance from end point
         d_obj = agent.sprite.dist_to_objective()
-        if (
-            d_obj == np.zeros(2)
-        ).all():  # if we have reached the destination, give max rwd
-            heading_rwd = 0
+        # if we have reached the destination, give max rwd
+        if (d_obj == np.zeros(2)).all():
+            # big +ve rwd for hitting goal
+            heading_rwd = 500
         else:
             # inverse distance reward, 1/(distance to objective) in [0,1],
             # then shift y intercept to make in [-1,0]
-            heading_rwd = (1 / np.sqrt((d_obj[0] ** 2) + (d_obj[1] ** 2))) - 1
-        # movement vector magnitude
-        delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
-        # rewarded for going as fast as possible, speed as fraction of top speed
-        # shifted to be in [-1,0] also
-        speed_rwd = (delta_rho / agent.sprite.speed) - 1
+            heading_rwd = (1 / np.hypot(d_obj[0], d_obj[1])) - 1
+
+            # linear reward (init_dist_to_obj - current_dist_to_obj)/init_dist_to_obj
+            # self.steer_coeff
+            init_d_obj = agent.sprite.dist_to_objective(pos=agent.init_pos)
+            curr_d_obj = agent.sprite.dist_to_objective()
+            heading_rwd = (
+                (
+                    np.hypot(init_d_obj[0], init_d_obj[1])
+                    - np.hypot(curr_d_obj[0], curr_d_obj[1])
+                )
+                / np.hypot(init_d_obj[0], init_d_obj[1])
+            ) - 1
 
         # primitive reward function
         #  terms strictly -ve to avoid inf actions leading to inf rewards
 
-        rwd = heading_rwd + speed_rwd + collide_rwd
+        rwd = heading_rwd + collide_rwd
 
         if np.isnan(rwd):
             print("primitive reward returned NaN")

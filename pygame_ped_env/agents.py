@@ -16,6 +16,7 @@ class RLVehicle(Vehicle):
         self.model = None
 
         self.moved = np.array([0, 0])
+        self.init_pos = np.array(start)
         self.objective = np.array(end)
         # if direction == "right":
         #     self.objective = []
@@ -26,8 +27,11 @@ class RLVehicle(Vehicle):
         # elif direction == "up":
         #     self.rect.y -= self.speed
 
-    def dist_to_objective(self):
-        return np.abs(self.rect.center - self.objective)
+    def dist_to_objective(self, pos=None):
+        if pos:
+            return np.abs(pos - self.objective)
+        else:
+            return np.abs(self.rect.center - self.objective)
 
     def act(self, action):
         x, y = self.rect.x, self.rect.y
