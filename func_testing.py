@@ -8,7 +8,7 @@ for i in range(1, n):
     coeffs = np.insert(coeffs, 0, 1 / (i + 1))
     coeffs = np.append(coeffs, i + 1)
 
-x = np.linspace(-1.0, 1.0, num=1000)
+x = np.linspace(0.0, 1.0, num=1000)
 plt.figure(figsize=(12, 9))
 
 for i in coeffs:
