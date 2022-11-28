@@ -9,13 +9,36 @@ import numpy as np
 
 class RLVehicle(Vehicle):
     # class for hooking in RL algorithms
-    def __init__(self, start, end, vehicleClass, direction, *groups: AbstractGroup):
+    def __init__(self, window_size, vehicleClass, direction, *groups: AbstractGroup):
+        
+        if direction == "right":
+            start =[0, window_size[1] / 2]
+            end = [window_size[0], window_size[1] / 2]
+        elif direction == "left":
+            start = [window_size[0], window_size[1] / 2]
+            end = [0, window_size[1] / 2]
+        else:
+            raise AttributeError("Only \"left\" and \"right\" directions are implemented for vehicles")
+            
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
+        
+        start = self.rect.center
+        if direction == "right":
+            end -= self.lane_offset
+        else:
+            end += self.lane_offset
 
         # hook for RL algo
         self.model = None
+        
+        #  if self.direction == "right":
+        #     self.rect.bottom = y - ((2 - self.lane) * LANEWIDTH)
+        # elif self.direction == "down":
+        #     self.rect.left = x + ((2 - self.lane) * LANEWIDTH)
+        # elif self.direction == "left":
+        #     self.rect.top = y + ((2 - self.lane) * LANEWIDTH)
 
-        self.moved = np.array([0, 0])
+        self.moved = [np.array([0,0])]
         self.init_pos = np.array(start)
         self.objective = np.array(end)
         # if direction == "right":
@@ -26,6 +49,22 @@ class RLVehicle(Vehicle):
         #     self.rect.x -= self.speed
         # elif direction == "up":
         #     self.rect.y -= self.speed
+        self.action_map = {
+            0: np.array([0,1]), #"down"
+            1: np.array([-1,1]), #"downleft"
+            2: np.array([-1,0]), #"left"
+            3: np.array([-1,-1]), #"upleft"
+            4: np.array([0,-1]), #"up"
+            5: np.array([1,-1]), #"upright"
+            6: np.array([1,0]), #"right"
+            7: np.array([1,1]), #"downright"
+            }
+        self.speed_map = {
+            0: np.floor(self.speed*(1/3)), #"slow"
+            1: np.floor(self.speed*(2/3)), #"medium"
+            2: np.floor(self.speed*(1)), #"fast"
+            3: 0.0, #"nomove"
+            }
 
     def dist_to_objective(self, pos=None):
         if pos:
@@ -34,21 +73,9 @@ class RLVehicle(Vehicle):
             return np.abs(self.rect.center - self.objective)
 
     def act(self, action):
-        x, y = self.rect.x, self.rect.y
-
-        if action == "right":
-            self.rect.x += self.speed  # move the vehicle
-        elif action == "down":
-            self.rect.y += self.speed
-        elif action == "left":
-            self.rect.x -= self.speed
-        elif action == "up":
-            self.rect.y -= self.speed
-
-        dx = self.rect.x - x
-        dy = self.rect.y - y
-        # self.moved = np.clip(np.sqrt(dx**2 + dy**2), 0, self.speed)
-        self.moved = [dx, dy]
+        mapped_action = self.action_map[action%8][1]*self.speed_map[np.floor(action/8)][1]
+        self.rect.center += mapped_action
+        self.moved.append(mapped_action)         
 
     def update(self):
         pass

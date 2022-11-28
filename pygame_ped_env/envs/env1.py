@@ -55,7 +55,8 @@ class RLCrossingSim(gym.Env):
         self.observation_space = gym.spaces.Box(
             low=-150, high=self.sim_area_x + 150, shape=(8,)
         )
-        self.action_space = gym.spaces.Discrete(4)
+        # (8 directions * 3 speeds) + 1 no_op action
+        self.action_space = gym.spaces.Discrete(25)
 
         self.init_sprites = {}
 
@@ -81,7 +82,17 @@ class RLCrossingSim(gym.Env):
             self.background = self.generateBackground()
 
         self.vehicleTypes = {0: "car", 1: "bus", 2: "truck", 3: "bike"}
-        self.directionNumbers = {0: "down", 1: "left", 2: "up", 3: "right"}
+        # discrete int action to relative action now converted in agent class
+        # self.directionNumbers = {
+        #     0: "down",
+        #     1: "downleft",
+        #     2: "left",
+        #     3: "upleft",
+        #     4: "up",
+        #     5: "upright",
+        #     6:"right",
+        #     7:"downright",
+        #     }
 
         # Gap between vehicles
         # movingGap = 15  # moving gap
@@ -160,22 +171,21 @@ class RLCrossingSim(gym.Env):
         horizontal_road.rect.midleft = (0, self.sim_area_y / 2)
 
     def get_reward(self, agent: RLVehicle):
-        # place holder function for social rewards
-        prim_rwd, done = self.get_primitive_reward(agent)
-        if done:
-            return prim_rwd, done
-        else:
+        # function for social rewards
+        # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
+        p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
 
-            if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
-                collide_rwd = -1
-                # elif not pygame.sprite.spritecollide(agent.sprite, self.roads.lane, False):
-                collide_rwd = -0.5
+        if any(np.isnan([p_rwd, s_rwd, h_rwd, c_rwd])):
+            print("primitive reward returned NaN")
+            import pdb
 
-            # movement vector magnitude
-            delta_rho = np.sqrt(agent.sprite.moved[0] ** 2 + agent.sprite.moved[1] ** 2)
-            # rewarded for going as fast as possible, speed as fraction of top speed
-            # shifted to be in [-1,0] also
-            speed_rwd = (delta_rho / agent.sprite.speed) - 1  # self.speed_coeff
+            pdb.set_trace()
+            
+        rwd = (np.power(p_rwd, self.pos_coeff) - 1) + (np.power(s_rwd, self.speed_coeff) - 1) + (np.power(h_rwd, self.steer_coeff) - 1) + c_rwd
+        
+        return rwd, done
+
+            
 
     def get_primitive_reward(self, agent: RLVehicle):
         done = False
@@ -185,48 +195,66 @@ class RLCrossingSim(gym.Env):
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
             collide_rwd = -1000
             done = True
+        
+        if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
+                collide_rwd = -1
+                # elif not pygame.sprite.spritecollide(agent.sprite, self.roads.lane, False):
+                # collide_rwd = -0.5
 
         # distance from end point
-        d_obj = agent.sprite.dist_to_objective()
+        curr_d_obj = agent.sprite.dist_to_objective()
         # if we have reached the destination, give max rwd
-        if (d_obj == np.zeros(2)).all():
+        if (curr_d_obj == np.zeros(2)).all():
             # big +ve rwd for hitting goal
-            heading_rwd = 500
+            position_rwd = 500
+            done = True
         else:
-            # inverse distance reward, 1/(distance to objective) in [0,1],
-            # then shift y intercept to make in [-1,0]
-            heading_rwd = (1 / np.hypot(d_obj[0], d_obj[1])) - 1
+            # inverse distance reward, 1/(distance to objective) in [0,1]
+            # position_rwd = (1 / np.hypot(d_obj[0], d_obj[1]))
 
             # linear reward (init_dist_to_obj - current_dist_to_obj)/init_dist_to_obj
-            # self.steer_coeff
             init_d_obj = agent.sprite.dist_to_objective(pos=agent.init_pos)
-            curr_d_obj = agent.sprite.dist_to_objective()
-            heading_rwd = (
+            
+            rho_init = np.hypot(init_d_obj[0], init_d_obj[1])
+            rho_curr = np.hypot(curr_d_obj[0], curr_d_obj[1])
+            
+            rho_scaled = (
                 (
-                    np.hypot(init_d_obj[0], init_d_obj[1])
-                    - np.hypot(curr_d_obj[0], curr_d_obj[1])
+                    rho_init
+                    - rho_curr
                 )
-                / np.hypot(init_d_obj[0], init_d_obj[1])
-            ) - 1
+                / rho_init
+            )
+            
+            theta_scaled = np.arccos(np.dot(init_d_obj,curr_d_obj)/(rho_init*rho_curr))
+            
+            position_rwd = (rho_scaled + theta_scaled) /2
 
+        # movement vector magnitude for this action
+        delta_rho_1 = np.hypot(agent.sprite.moved[-1][0], agent.sprite.moved[-1][1])
+        # rewarded for going as fast as possible, speed as fraction of top speed
+        speed_rwd = (delta_rho_1 / agent.sprite.speed)
         # primitive reward function
         #  terms strictly -ve to avoid inf actions leading to inf rewards
 
-        rwd = heading_rwd + collide_rwd
+        # movement vector magnitude for previous action
+        delta_rho_2 = np.hypot(agent.sprite.moved[-2][0], agent.sprite.moved[-2][1])
+        
+        #angle between 2 vectors definition       
+        theta_s = np.arccos(np.dot(agent.sprite.moved[-1],agent.sprite.moved[-2])/(delta_rho_1*delta_rho_2))
+        
+        heading_rwd = (np.pi - theta_s)/np.pi
 
-        if np.isnan(rwd):
-            print("primitive reward returned NaN")
-            import pdb
+        return position_rwd, speed_rwd, heading_rwd, collide_rwd, done
 
-            pdb.set_trace()
 
-        return rwd, done
+
 
     def step(self, action):
         # extract action from array if given as numpy array from sb3
         if isinstance(action, np.ndarray):
             action = action.item()
-        self.vehicle.sprite.act(self.directionNumbers[action])
+        self.vehicle.sprite.act(action)
         try:
             self.pedestrian.sprite.update()
             ped_rect = self.pedestrian.sprite.rect

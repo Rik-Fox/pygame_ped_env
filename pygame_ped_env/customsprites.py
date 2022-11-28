@@ -83,7 +83,7 @@ class Pedestrian(Sprite):
 
 class Vehicle(Sprite):
     def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
-
+        
         speeds = {
             "car": 3.25,
             "bus": 1.8,
@@ -91,8 +91,7 @@ class Vehicle(Sprite):
             "bike": 2.5,
         }  # average speeds of vehicles
 
-        self.lane = lane
-        LANEWIDTH = 15
+        self.lane_offset = ((2 - lane) * 15)
         self.vehicleClass = vehicleClass
         self.speed = speeds[vehicleClass]
         # self.direction_number = direction_number
@@ -107,13 +106,13 @@ class Vehicle(Sprite):
         self.rect.y = y
 
         if self.direction == "right":
-            self.rect.bottom = y - ((2 - self.lane) * LANEWIDTH)
+            self.rect.bottom = y - self.lane_offset
         elif self.direction == "down":
-            self.rect.left = x + ((2 - self.lane) * LANEWIDTH)
+            self.rect.left = x + self.lane_offset
         elif self.direction == "left":
-            self.rect.top = y + ((2 - self.lane) * LANEWIDTH)
+            self.rect.top = y + self.lane_offset
         elif self.direction == "up":
-            self.rect.right = x - ((2 - self.lane) * LANEWIDTH)
+            self.rect.right = x - self.lane_offset
 
         self.moved = 0
         super().__init__(*groups)
