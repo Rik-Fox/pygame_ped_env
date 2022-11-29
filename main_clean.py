@@ -16,8 +16,10 @@ from custom_logging import CustomTrackingCallback
 
 class Main:
 
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", time.asctime())
-    print("log_path => ",str(log_path))
+    log_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "logs", "train_logs", time.asctime()
+    )
+    # print("log_path => ",str(log_path))
 
     window = (720, 576)
 
@@ -43,9 +45,8 @@ class Main:
 
     agent.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
 
-
     agent.model.learn(
-        total_timesteps= 250 * n_episodes,
+        total_timesteps=250 * n_episodes,
         tb_log_name="DQN_testing",
         callback=CustomTrackingCallback(
             check_freq=1000,
@@ -55,7 +56,7 @@ class Main:
         ),
     )
 
-    agent.model.save(os.path.join(log_path,"test_model"), include="env")
+    agent.model.save(os.path.join(log_path, "test_model"), include="env")
 
 
 if __name__ == "__main__":

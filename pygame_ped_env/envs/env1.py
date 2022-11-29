@@ -30,8 +30,8 @@ class RLCrossingSim(gym.Env):
         steering_coefficient=1.0,
     ) -> None:
         assert (
-            len(controllable_sprites) == 2
-        ), "Must pass only 2 sprite entities to RL Crossing env"
+            2 <= len(controllable_sprites) <= 3
+        ), "Must pass only 2 or 3 sprite entities to RL Crossing env"
         super().__init__()
         np.random.seed(seed)
 
@@ -53,24 +53,35 @@ class RLCrossingSim(gym.Env):
 
         # 150 is offscreen pixel buffer, TODO: should be associated to agent sprite rect
         self.observation_space = gym.spaces.Box(
-            low=-150, high=self.sim_area_x + 150, shape=(8,)
+            low=-150, high=self.sim_area_x + 150, shape=(12,)
         )
         # (8 directions * 3 speeds) + 1 no_op action
         self.action_space = gym.spaces.Discrete(25)
 
         self.init_sprites = {}
 
-        for sprite in controllable_sprites:
-            if isinstance(sprite, (RLVehicle, KeyboardVehicle)):
-                self.vehicle = GroupSingle(sprite)
-                self.init_sprites[sprite] = sprite.rect.copy()
-            elif isinstance(sprite, (RandomPedestrian, KeyboardPedestrian)):
-                self.pedestrian = GroupSingle(sprite)
-                self.init_sprites[sprite] = sprite.rect.copy()
+        self.vehicle = GroupSingle()
+        self.traffic = GroupSingle()
+        self.pedestrian = GroupSingle()
+
+        if len(controllable_sprites) == 2:
+            sprite = Sprite()
+            sprite.rect = pygame.Rect(0, 0, 0, 0)
+            self.traffic.add(sprite)
+
+        for i, sprite in enumerate(controllable_sprites):
+            self.init_sprites[sprite] = sprite.rect.copy()
+            if i == 0:
+                self.vehicle.add(sprite)
             else:
-                raise TypeError(
-                    "Only one vehicle and one pedestrian can be passed into this environment",
-                )
+                if isinstance(sprite, (RLVehicle, KeyboardVehicle)):
+                    self.traffic.add(sprite)
+                elif isinstance(sprite, (RandomPedestrian, KeyboardPedestrian)):
+                    self.pedestrian.add(sprite)
+                else:
+                    raise TypeError(
+                        "Only one or two vehicles and one pedestrian can be passed into this environment",
+                    )
 
         self.roads = Group()
         self.generateRoads()
@@ -175,86 +186,101 @@ class RLCrossingSim(gym.Env):
         # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
         p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
 
-        if any(np.isnan([p_rwd, s_rwd, h_rwd, c_rwd])):
-            print("primitive reward returned NaN")
-            import pdb
+        # linearly combine rewards
+        # apply convex or concave adjustment, and then shift to (-1,0]
+        rwd = (
+            (np.power(p_rwd, self.pos_coeff) - 1)
+            + (np.power(s_rwd, self.speed_coeff) - 1)
+            + (np.power(h_rwd, self.steer_coeff) - 1)
+            + c_rwd
+        )
 
-            pdb.set_trace()
-            
-        rwd = (np.power(p_rwd, self.pos_coeff) - 1) + (np.power(s_rwd, self.speed_coeff) - 1) + (np.power(h_rwd, self.steer_coeff) - 1) + c_rwd
-        
         return rwd, done
-
-            
 
     def get_primitive_reward(self, agent: RLVehicle):
         done = False
-        collide_rwd = 0  # 0 no collision, -1 offroad, -2 hit pedestrian
+        collide_rwd = 0  # 0 no collision, -1 offroad, -infty hit pedestrian
 
         # if run over pedestrian, give reward reduction and end episode
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
-            collide_rwd = -1000
+            collide_rwd = -np.infty
             done = True
-        
+
         if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
-                collide_rwd = -1
-                # elif not pygame.sprite.spritecollide(agent.sprite, self.roads.lane, False):
-                # collide_rwd = -0.5
+            collide_rwd = -1
+            # elif not pygame.sprite.spritecollide(agent.sprite, self.roads.lane, False):
+            # collide_rwd = -0.5
 
         # distance from end point
         curr_d_obj = agent.sprite.dist_to_objective()
         # if we have reached the destination, give max rwd
         if (curr_d_obj == np.zeros(2)).all():
-            # big +ve rwd for hitting goal
-            position_rwd = 500
+            # rwd for hitting goal
+            position_rwd = 1
             done = True
         else:
-            # inverse distance reward, 1/(distance to objective) in [0,1]
-            # position_rwd = (1 / np.hypot(d_obj[0], d_obj[1]))
+            # straight line vector from start to goal
+            init_d_obj = agent.sprite.dist_to_objective(pos=agent.sprite.init_pos)
 
-            # linear reward (init_dist_to_obj - current_dist_to_obj)/init_dist_to_obj
-            init_d_obj = agent.sprite.dist_to_objective(pos=agent.init_pos)
-            
+            # magnitudes of init and curr vectors to goal
             rho_init = np.hypot(init_d_obj[0], init_d_obj[1])
             rho_curr = np.hypot(curr_d_obj[0], curr_d_obj[1])
-            
-            rho_scaled = (
-                (
-                    rho_init
-                    - rho_curr
-                )
-                / rho_init
+
+            # normalised difference in vector magnitudes
+            rho_scaled = (rho_init - rho_curr) / rho_init
+
+            # angle between stright line to goal and curent path to goal
+            # in (0, pi]
+            theta_diff = np.arccos(
+                np.dot(init_d_obj, curr_d_obj) / (rho_init * rho_curr)
             )
-            
-            theta_scaled = np.arccos(np.dot(init_d_obj,curr_d_obj)/(rho_init*rho_curr))
-            
-            position_rwd = (rho_scaled + theta_scaled) /2
+
+            # recale to have theta in (0,1]
+            theta_scaled = (np.pi - theta_diff) / np.pi
+
+            # reward is linear combination of normed rho and theta
+            # rho_scaled rewards for progression to goal (degined to be along x axis)
+            # theta_scaled punishes for deviation from stright path (degined to be along y axis)
+            position_rwd = (rho_scaled + theta_scaled) / 2
 
         # movement vector magnitude for this action
         delta_rho_1 = np.hypot(agent.sprite.moved[-1][0], agent.sprite.moved[-1][1])
+
         # rewarded for going as fast as possible, speed as fraction of top speed
-        speed_rwd = (delta_rho_1 / agent.sprite.speed)
-        # primitive reward function
-        #  terms strictly -ve to avoid inf actions leading to inf rewards
+        speed_rwd = delta_rho_1 / agent.sprite.speed
 
         # movement vector magnitude for previous action
         delta_rho_2 = np.hypot(agent.sprite.moved[-2][0], agent.sprite.moved[-2][1])
-        
-        #angle between 2 vectors definition       
-        theta_s = np.arccos(np.dot(agent.sprite.moved[-1],agent.sprite.moved[-2])/(delta_rho_1*delta_rho_2))
-        
-        heading_rwd = (np.pi - theta_s)/np.pi
+
+        # from angle between 2 vectors definition
+        theta_s = np.arccos(
+            np.clip(
+                np.dot(agent.sprite.moved[-1], agent.sprite.moved[-2])
+                / (
+                    (delta_rho_1 * delta_rho_2) + 1e-15
+                ),  # 1e-15 to avoid divide by zero
+                -1.0,
+                1.0,
+            )  # clip to avoid round off error or +1e-15 taking arg out of arccos domain [-1,1]
+        )
+        # punishes proportionally for turning in this action
+        heading_rwd = (np.pi - theta_s) / np.pi
+
+        # catch any bad edge cases from calculations
+        if any(np.isnan([position_rwd, speed_rwd, heading_rwd, collide_rwd])):
+            print("primitive reward returned NaN")
+            import pdb
+
+            pdb.set_trace()
 
         return position_rwd, speed_rwd, heading_rwd, collide_rwd, done
 
-
-
-
     def step(self, action):
-        # extract action from array if given as numpy array from sb3
-        if isinstance(action, np.ndarray):
-            action = action.item()
+
         self.vehicle.sprite.act(action)
+
+        self.traffic.sprite.update(self.traffic_action)
+
         try:
             self.pedestrian.sprite.update()
             ped_rect = self.pedestrian.sprite.rect
@@ -269,9 +295,15 @@ class RLCrossingSim(gym.Env):
         obs = np.hstack(
             [
                 [self.vehicle.sprite.rect],
-                [ped_rect],
+                [self.traffic.sprite.rect],  # padding for single vehicle scenario
+                [self.pedestrian.sprite.rect],
             ],
         )
+        try:
+            self.traffic_action = self.traffic.sprite.model.predict(obs)
+        except:
+            self.traffic_action = None
+
         rwd, self.done = self.get_reward(self.vehicle)
 
         # remove vehicles once they drive offscreen and finish episode
@@ -313,12 +345,16 @@ class RLCrossingSim(gym.Env):
     def reset(self):
 
         self.vehicle.empty()
+        self.traffic.empty()
         self.pedestrian.empty()
 
-        for sprite in [*self.init_sprites.keys()]:
+        for i, sprite in enumerate([*self.init_sprites.keys()]):
             if isinstance(sprite, (RLVehicle, KeyboardVehicle)):
                 sprite.rect = self.init_sprites[sprite].copy()
-                self.vehicle.add(sprite)
+                if i == 0:
+                    self.vehicle.add(sprite)
+                else:
+                    self.traffic.add(sprite)
             elif isinstance(sprite, (RandomPedestrian, KeyboardPedestrian)):
                 sprite.rect = self.init_sprites[sprite].copy()
                 # slight noise in pedestrian start position
@@ -339,10 +375,16 @@ class RLCrossingSim(gym.Env):
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
 
+        try:
+            self.traffic_action = self.traffic.sprite.model.predict(obs)
+        except:
+            self.traffic_action = None
+
         self.done = False
         obs = np.hstack(
             [
                 [self.vehicle.sprite.rect],
+                [self.traffic.sprite.rect],  # padding for single vehicle scenario
                 [self.pedestrian.sprite.rect],
             ],
         )

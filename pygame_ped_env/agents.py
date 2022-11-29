@@ -10,75 +10,73 @@ import numpy as np
 class RLVehicle(Vehicle):
     # class for hooking in RL algorithms
     def __init__(self, window_size, vehicleClass, direction, *groups: AbstractGroup):
-        
+
         if direction == "right":
-            start =[0, window_size[1] / 2]
+            start = [0, window_size[1] / 2]
             end = [window_size[0], window_size[1] / 2]
         elif direction == "left":
             start = [window_size[0], window_size[1] / 2]
             end = [0, window_size[1] / 2]
         else:
-            raise AttributeError("Only \"left\" and \"right\" directions are implemented for vehicles")
-            
+            raise AttributeError(
+                'Only "left" and "right" directions are implemented for vehicles'
+            )
+
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
-        
+
         start = self.rect.center
-        if direction == "right":
-            end -= self.lane_offset
-        else:
-            end += self.lane_offset
+        # ensure goal is centred in lane after car sprite position is adjusted in super
+        end[1] = start[1]
 
         # hook for RL algo
         self.model = None
-        
-        #  if self.direction == "right":
-        #     self.rect.bottom = y - ((2 - self.lane) * LANEWIDTH)
-        # elif self.direction == "down":
-        #     self.rect.left = x + ((2 - self.lane) * LANEWIDTH)
-        # elif self.direction == "left":
-        #     self.rect.top = y + ((2 - self.lane) * LANEWIDTH)
 
-        self.moved = [np.array([0,0])]
+        self.moved = [np.array([0, 0])]
         self.init_pos = np.array(start)
         self.objective = np.array(end)
-        # if direction == "right":
-        #     self.objective = []
-        # elif direction == "down":
-        #     self.rect.y += self.speed
-        # elif direction == "left":
-        #     self.rect.x -= self.speed
-        # elif direction == "up":
-        #     self.rect.y -= self.speed
-        self.action_map = {
-            0: np.array([0,1]), #"down"
-            1: np.array([-1,1]), #"downleft"
-            2: np.array([-1,0]), #"left"
-            3: np.array([-1,-1]), #"upleft"
-            4: np.array([0,-1]), #"up"
-            5: np.array([1,-1]), #"upright"
-            6: np.array([1,0]), #"right"
-            7: np.array([1,1]), #"downright"
-            }
-        self.speed_map = {
-            0: np.floor(self.speed*(1/3)), #"slow"
-            1: np.floor(self.speed*(2/3)), #"medium"
-            2: np.floor(self.speed*(1)), #"fast"
-            3: 0.0, #"nomove"
-            }
 
-    def dist_to_objective(self, pos=None):
-        if pos:
+        self.action_map = {
+            0: np.array([0, 1]),  # "down"
+            1: np.array([-1, 1]),  # "downleft"
+            2: np.array([-1, 0]),  # "left"
+            3: np.array([-1, -1]),  # "upleft"
+            4: np.array([0, -1]),  # "up"
+            5: np.array([1, -1]),  # "upright"
+            6: np.array([1, 0]),  # "right"
+            7: np.array([1, 1]),  # "downright"
+        }
+        self.speed_map = {
+            0: np.floor(self.speed * (1 / 3)),  # "slow"
+            1: np.floor(self.speed * (2 / 3)),  # "medium"
+            2: np.floor(self.speed * (1)),  # "fast"
+            3: 0.0,  # "nomove"
+        }
+
+    def dist_to_objective(self, pos=np.array([None, None])):
+        if pos.any():
             return np.abs(pos - self.objective)
         else:
             return np.abs(self.rect.center - self.objective)
 
     def act(self, action):
-        mapped_action = self.action_map[action%8][1]*self.speed_map[np.floor(action/8)][1]
+        mapped_action = (
+            self.action_map[action[0][0] % 8]
+            * self.speed_map[np.floor(action[0][0] / 8)]
+        )
         self.rect.center += mapped_action
-        self.moved.append(mapped_action)         
+        self.moved.append(mapped_action)
 
-    def update(self):
-        pass
+    def update(self, action=None):
+        self.rect.center += np.array([-1, 0])
+        # if action:
+        #     mapped_action = (
+        #         self.action_map[action[0][0] % 8]
+        #         * self.speed_map[np.floor(action[0][0] / 8)]
+        #     )
+        #     self.rect.center += mapped_action
+        #     self.moved.append(mapped_action)
+        # else:
+        # pass
         # self.act() random choice for action
         # return super().update()
 
@@ -149,7 +147,7 @@ class RandomPedestrian(Pedestrian):
         direction = self.get_direction()
 
         def polarRandom(dx, dy):
-            epsilon = ((np.random.rand() * 2) - 1) / 200
+            epsilon = ((np.random.rand() * 2) - 1) / 50
             # epsilon = 0
             if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
                 self.rect.x += 1
