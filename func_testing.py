@@ -3,12 +3,15 @@ import numpy as np
 
 coeffs = np.ones([1])
 
-n = 5
+n = 6
 for i in range(1, n):
     coeffs = np.insert(coeffs, 0, 1 / (i + 1))
     coeffs = np.append(coeffs, i + 1)
 
-x = np.linspace(0.0, 1.0, num=1000)
+x = np.linspace(0.0, 1.0, num=10000)
+
+
+# using the variable axs for multiple Axes
 fig, axs = plt.subplots(2, 2, figsize=(12, 9))
 
 Y = []
@@ -20,20 +23,26 @@ for k, i in enumerate(coeffs):
 
 for k in range(len(Y)):
     if k < 5:
-        y_diff.append(Y[k] - Y[4])
+        y_diff.append(np.subtract(Y[k], Y[5]))
     else:
-        y_diff.append(Y[4] - Y[k])
+        y_diff.append(np.subtract(Y[k], Y[5]))
 
-    axs[1][0].plot(x, y_diff[k], label=f"y=x^{i} - y=x")
-
-for k in range(n):
-    axs[0][1].plot(x, np.subtract(Y[4 - k], Y[4 + k]), label=f"x^{k+1} - x^1/{k+1}")
-    axs[1][1].plot(
-        x,
-        np.subtract(y_diff[4 - k], y_diff[4 + k]),
-        label=f"x^{coeffs[4-k]} - x^{coeffs[4+k]}",
+    axs[1][0].plot(
+        x, y_diff[k], label=f"x^{np.round(coeffs[k], 2)} - x^{np.round(coeffs[5], 2)}"
     )
 
+for k in range(n):
+    axs[0][1].plot(
+        x,
+        np.divide(np.add(Y[n - 1 - k], Y[n - 1 + k]), 2),
+        label=f"(x^{coeffs[n - 1 - k]} + x^{coeffs[n - 1 - k]})/2",
+    )
+
+    axs[1][1].plot(
+        x,
+        np.divide(np.add(y_diff[n - 1 - k], y_diff[n - 1 + k]), 2),
+        label=f"(x^{np.round(coeffs[n - 1 - k], 2)} + x^{np.round(coeffs[n - 1 + k], 2)})/2",
+    )
 
 plt.legend()
 plt.show()
