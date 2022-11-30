@@ -66,19 +66,17 @@ class RLVehicle(Vehicle):
         self.rect.center += mapped_action
         self.moved.append(mapped_action)
 
-    def update(self, action=None):
-        self.rect.center += np.array([-1, 0])
-        # if action:
-        #     mapped_action = (
-        #         self.action_map[action[0][0] % 8]
-        #         * self.speed_map[np.floor(action[0][0] / 8)]
-        #     )
-        #     self.rect.center += mapped_action
-        #     self.moved.append(mapped_action)
-        # else:
-        # pass
-        # self.act() random choice for action
-        # return super().update()
+    def update(self, action=None):  # for non learning agent
+        # self.rect.center += np.array([-1, 0]) # just move left
+        if action:
+            mapped_action = (
+                self.action_map[action[0][0] % 8]
+                * self.speed_map[np.floor(action[0][0] / 8)]
+            )
+            self.rect.center += mapped_action
+            self.moved.append(mapped_action)
+        else:
+            pass
 
 
 class RandomVehicle(Vehicle):

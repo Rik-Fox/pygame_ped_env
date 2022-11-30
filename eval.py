@@ -16,33 +16,57 @@ from custom_logging import CustomTrackingCallback
 
 class Eval:
 
-    # log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),"logs")
+    log_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "logs", "eval_logs", time.asctime()
+    )
     # print("log_path => ",str(log_path))
-
-    model_save_path = "/home/rfox/PhD/Term1_22-23_Experiements/logs/DQN_testing_10"
 
     window = (720, 576)
 
-    agent = RLVehicle([0, window[1] / 2], [window[0], window[1] / 2], "car", "right")
+    agent = RLVehicle(window, "car", "right")
+    agentL = RLVehicle(window, "car", "left")
 
-    agent.model = DQN.load(os.path.join(model_save_path, "worst"))
+    model_save_path = None
 
-    env = agent.model.get_env()
-    if env is None:
-        agent.model.set_env(
-            gym.make(
-                "pygame_ped_env:ped_env-v1",
-                sim_area=window,
-                controllable_sprites=[
-                    agent,
-                    # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
-                    RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-                ],
-                headless=False,
-                seed=4321,
-            )
-        )
+    if model_save_path:
+        agent.model = DQN.load(os.path.join(model_save_path, "best"))
+
+    try:
         env = agent.model.get_env()
+        if env is None:
+            agent.model.set_env(
+                gym.make(
+                    "pygame_ped_env:ped_env-v1",
+                    sim_area=window,
+                    controllable_sprites=[
+                        agent,
+                        agentL,
+                        # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
+                        RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
+                    ],
+                    headless=False,
+                    simple_reward=False,
+                    seed=4321,
+                )
+            )
+            env = agent.model.get_env()
+
+    except AttributeError:
+        env = gym.make(
+            "pygame_ped_env:ped_env-v1",
+            sim_area=window,
+            controllable_sprites=[
+                agent,
+                agentL,
+                # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
+                RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
+            ],
+            headless=False,
+            simple_reward=False,
+            seed=4321,
+        )
+        agent.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
+        agentL.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
 
     n_episodes = 6
 

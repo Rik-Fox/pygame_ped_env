@@ -110,8 +110,8 @@ class Vehicle(Sprite):
         elif self.direction == "down":
             self.rect.left = x + self.lane_offset
         elif self.direction == "left":
-            self.rect.top = y + self.lane_offset
-            self.rect.left = x - 100
+            self.rect.top = y + self.lane_offset + 5
+            # self.rect.left -= 100
         elif self.direction == "up":
             self.rect.right = x - self.lane_offset
 

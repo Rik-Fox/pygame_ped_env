@@ -25,6 +25,7 @@ class RLCrossingSim(gym.Env):
         controllable_sprites: Union[None, Sprite, Sequence[Sprite]] = None,
         headless=False,
         seed=1234,
+        simple_reward=True,
         speed_coefficient=1.0,
         position_coefficient=1.0,
         steering_coefficient=1.0,
@@ -37,6 +38,9 @@ class RLCrossingSim(gym.Env):
 
         # whether to render or not
         self.headless = headless
+
+        # whether to have shaped reward or not
+        self.simple_reward = simple_reward
 
         # reward weightings, used to adjust for repsonse data
         self.speed_coeff = speed_coefficient
@@ -182,18 +186,46 @@ class RLCrossingSim(gym.Env):
         horizontal_road.rect.midleft = (0, self.sim_area_y / 2)
 
     def get_reward(self, agent: RLVehicle):
-        # function for social rewards
-        # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
-        p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
 
-        # linearly combine rewards
-        # apply convex or concave adjustment, and then shift to (-1,0]
-        rwd = (
-            (np.power(p_rwd, self.pos_coeff) - 1)
-            + (np.power(s_rwd, self.speed_coeff) - 1)
-            + (np.power(h_rwd, self.steer_coeff) - 1)
-            + c_rwd
-        )
+        if self.simple_reward:
+            rwd, done = self.get_simple_reward(agent)
+
+        else:
+            # function for social rewards
+            # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
+            p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
+
+            # linearly combine rewards
+            # apply convex or concave adjustment, and then shift to (-1,0]
+            rwd = (
+                (np.power(p_rwd, self.pos_coeff) - 1)
+                + (np.power(s_rwd, self.speed_coeff) - 1)
+                + (np.power(h_rwd, self.steer_coeff) - 1)
+                + c_rwd
+            )
+
+        return rwd, done
+
+    def get_simple_reward(self, agent: RLVehicle):
+        done = False
+        collide_rwd = 0  # 0 no collision, -1 offroad, -infty hit pedestrian
+
+        # if run over pedestrian, give reward reduction and end episode
+        if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
+            return -np.infty, True
+
+        on_road = 0.01
+        if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
+            on_road = -0.01
+
+        curr_d_obj = agent.sprite.dist_to_objective()
+        # if we have reached the destination, give max rwd
+        if (curr_d_obj == np.zeros(2)).all():
+            # rwd for hitting goal
+            rwd = 1000
+            done = True
+        else:
+            rwd = -0.04 + on_road
 
         return rwd, done
 
@@ -280,6 +312,8 @@ class RLCrossingSim(gym.Env):
         self.vehicle.sprite.act(action)
 
         self.traffic.sprite.update(self.traffic_action)
+        # print(self.traffic.sprite.rect.center)
+        # print(self.traffic_action)
 
         try:
             self.pedestrian.sprite.update()
@@ -333,6 +367,11 @@ class RLCrossingSim(gym.Env):
         self.vehicle.draw(self.screen)
         self.pedestrian.draw(self.screen)
 
+        try:
+            self.traffic.draw(self.screen)
+        except:
+            pass
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit()
@@ -347,6 +386,11 @@ class RLCrossingSim(gym.Env):
         self.vehicle.empty()
         self.traffic.empty()
         self.pedestrian.empty()
+
+        if len([*self.init_sprites.keys()]) == 2:
+            sprite = Sprite()
+            sprite.rect = pygame.Rect(0, 0, 0, 0)
+            self.traffic.add(sprite)
 
         for i, sprite in enumerate([*self.init_sprites.keys()]):
             if isinstance(sprite, (RLVehicle, KeyboardVehicle)):
