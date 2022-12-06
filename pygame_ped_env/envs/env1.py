@@ -6,10 +6,11 @@ import os
 import gym
 import numpy as np
 
+from stable_baselines3 import DQN
 from pygame.sprite import Sprite, Group, GroupSingle
 from typing import Union, Sequence
-import pygame_ped_env
 
+import pygame_ped_env
 from pygame_ped_env.agents import (
     RLVehicle,
     KeyboardVehicle,
@@ -23,10 +24,12 @@ class RLCrossingSim(gym.Env):
         self,
         sim_area,
         scenarioList: Union[None, Sequence[int]] = None,
-        evalu=False,
+        human_controlled_ped=False,
         headless=False,
         seed=1234,
-        static_model: any = None,
+        learning_model: any = None,
+        fixed_model: any = None,
+        log_path=None,
         speed_coefficient=1.0,
         position_coefficient=1.0,
         steering_coefficient=1.0,
@@ -37,11 +40,6 @@ class RLCrossingSim(gym.Env):
 
         # whether to render or not
         self.headless = headless
-
-        # path to traffic prediction model if used
-        self.modelT = static_model
-
-        self.training = not evalu
 
         # whether to have shaped reward or not
         # true by default, scenario will change it in reset()
@@ -82,8 +80,6 @@ class RLCrossingSim(gym.Env):
 
         self.scenario = lambda: np.random.choice(self.scenarioList)
 
-        self.reset()
-
         self.roads = Group()
         self.generateRoads()
 
@@ -93,7 +89,26 @@ class RLCrossingSim(gym.Env):
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
 
-        self.done = False
+        if not learning_model:
+            learning_model = DQN("MlpPolicy", self, verbose=0, tensorboard_log=log_path)
+            modelL_path = os.path.join(log_path, "DQN_model")
+            learning_model.save(modelL_path, include="env")
+        else:
+            modelL_path = learning_model
+
+        self.modelL = DQN.load(os.path.join(modelL_path))
+
+        if fixed_model:
+            learning_model = DQN.load(fixed_model)
+
+        # path to traffic prediction model if used
+        self.modelF = fixed_model
+
+        self.training = not human_controlled_ped
+
+        # self.reset()
+
+        # self.done = False
 
     def generateBackground(self):
         # Setting background image and scaling to window size
@@ -292,16 +307,11 @@ class RLCrossingSim(gym.Env):
         self.vehicle.sprite.act(action)
 
         self.traffic.sprite.update(self.traffic_action)
-        # print(self.traffic.sprite.rect.center)
-        # print(self.traffic_action)
-
         try:
             self.pedestrian.sprite.update()
-            ped_rect = self.pedestrian.sprite.rect
-        except AttributeError:
-            ped_rect = pygame.Rect(0, 0, 0, 0)
-            # import pdb
-            # pdb.set_trace()
+        except:
+            self.pedestrian.add(Sprite())
+            self.pedestrian.rect = pygame.Rect(0, 0, 0, 0)
 
         if not self.headless:
             self.render()
@@ -339,6 +349,12 @@ class RLCrossingSim(gym.Env):
                 self.vehicle.remove(self.vehicle.sprite)
                 self.done = True
 
+        if not self.done:
+            if not (0 <= self.pedestrian.sprite.rect.y <= self.sim_area_y):
+                self.pedestrian.remove(self.pedestrian.sprite)
+            elif not (0 <= self.pedestrian.sprite.rect.x <= self.sim_area_x):
+                self.pedestrian.remove(self.pedestrian.sprite)
+
         return obs, rwd, self.done, {}
 
     def render(self):
@@ -362,46 +378,46 @@ class RLCrossingSim(gym.Env):
         time.sleep(0.016)
 
     def reset(self):
-
+        self.vehicle.empty()
         scenario = self.scenario_map()[self.scenario()]
 
-        for i, agent in enumerate(scenario["agentSprites"]):
-            if i == 0:
-                if agent[0] == "R":
-                    agentL = RLVehicle.init_from_scenario(agent, self.screen_size)
-                    agentL.model = self.vehicle.sprite.model
-                    self.simple_reward = False
-                elif agent[0] == "S":
-                    agentL = RLVehicle.init_from_scenario(agent[1:])
-                    agentL.model = self.vehicle.sprite.model
-                    self.simple_reward = True
-                else:
-                    agentL = KeyboardVehicle.init_from_scenario(agent, self.screen_size)
+        agent = scenario["agentSprites"][0]
+        if agent[0] == "R":
+            agentL = RLVehicle.init_from_scenario(agent, self.screen_size)
+            agentL.model = self.modelL
+            self.simple_reward = False
+        elif agent[0] == "S":
+            agentL = RLVehicle.init_from_scenario(agent[1:], self.screen_size)
+            agentL.model = self.modelL
+            self.simple_reward = True
+        else:
+            agentL = KeyboardVehicle.init_from_scenario(agent, self.screen_size)
 
-                self.vehicle.empty()
-                self.vehicle.add(agentL)
+        self.vehicle.add(agentL)
 
-            elif (i > 0) and isinstance(agent, (RLVehicle, KeyboardVehicle)):
-                if agent[0] == "R":
-                    agentT = RLVehicle.init_from_scenario(agent, self.screen_size)
-                    agentT.model = self.modelT
-                    self.simple_reward = False
-                elif agent[0] == "S":
-                    agentT = RLVehicle.init_from_scenario(agent[1:], self.screen_size)
-                    agentT.model = self.modelT
-                    self.simple_reward = True
-                else:
-                    agentT = KeyboardVehicle.init_from_scenario(agent, self.screen_size)
+        self.traffic.empty()
+        try:
+            traffic_agent = scenario["agentSprites"][1]
 
-                self.traffic.empty()
-                self.traffic.add(agentT)
+            if traffic_agent[0] == "R":
+                agentF = RLVehicle.init_from_scenario(traffic_agent, self.screen_size)
+                agentF.model = self.modelF
+                self.simple_reward = False
+            elif traffic_agent[0] == "S":
+                agentF = RLVehicle.init_from_scenario(
+                    traffic_agent[1:], self.screen_size
+                )
+                agentF.model = self.modelF
+                self.simple_reward = True
+            else:
+                agentF = KeyboardVehicle.init_from_scenario(
+                    traffic_agent, self.screen_size
+                )
+        except:
+            agentF = Sprite()
+            agentF.rect = pygame.Rect(0, 0, 0, 0)
 
-        # pad second vehicle in obs if not present
-        if i == 0:
-            self.traffic.empty()
-            sprite = Sprite()
-            sprite.rect = pygame.Rect(0, 0, 0, 0)
-            self.traffic.add(sprite)
+        self.traffic.add(agentF)
 
         # add pedestrian, keyboard for experiment or random if just training or code evalling
         self.pedestrian.empty()
@@ -522,19 +538,19 @@ class RLCrossingSim(gym.Env):
                 "name": "RL_H_l",
                 "agentSprites": ["RL_left", "H_right"],
             },
-            2: {
+            6: {
                 "name": "1SRL",
                 "agentSprites": ["SRL_right"],
             },
-            3: {
+            7: {
                 "name": "2SRL",
                 "agentSprites": ["SRL_right", "SRL_left"],
             },
-            4: {
+            8: {
                 "name": "1H",
                 "agentSprites": ["H_right"],
             },
-            5: {
+            9: {
                 "name": "2RL",
                 "agentSprites": ["RL_right", "RL_left"],
             },

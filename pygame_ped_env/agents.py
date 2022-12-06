@@ -78,7 +78,7 @@ class RLVehicle(Vehicle):
             self.rect.center += mapped_action
             self.moved.append(mapped_action)
         else:
-            pass
+            self.rect.center += np.array([-1, 0])  # just move left
 
     @classmethod
     def init_from_scenario(cls, scenario: str, window_size):

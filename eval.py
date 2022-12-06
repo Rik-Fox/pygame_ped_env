@@ -18,7 +18,10 @@ from custom_logging import CustomTrackingCallback
 class Eval:
 
     log_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "logs", "eval_logs", time.asctime()
+        os.path.dirname(os.path.abspath(__file__)),
+        "logs",
+        "eval_logs",
+        # time.asctime(),
     )
     # print("log_path => ",str(log_path))
 
@@ -68,16 +71,14 @@ class Eval:
         # )
         env = RLCrossingSim(
             window,
-            # [
-            #     agent,
-            #     agentL,
-            #     RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-            # ],
+            scenarioList=[2],
             headless=False,
             seed=4321,
+            log_path=log_path,
+            # learning_model=os.path.join(model_save_path, "best"),
+            learning_model=None,
+            fixed_model=None,
         )
-        agent.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
-        agentL.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
 
     n_episodes = 6
 
@@ -85,7 +86,7 @@ class Eval:
         obs = env.reset()
         done = False
         while not done:
-            obs, reward, done, info = env.step(agent.model.predict(obs))
+            obs, reward, done, info = env.step(env.modelL.predict(obs))
 
 
 if __name__ == "__main__":
