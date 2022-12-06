@@ -6,6 +6,7 @@ from pygame_ped_env.agents import (
     KeyboardPedestrian,
     RandomPedestrian,
 )  # , Road
+from pygame_ped_env.envs import RLCrossingSim
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_util import make_vec_env
@@ -52,17 +53,27 @@ class Eval:
             env = agent.model.get_env()
 
     except AttributeError:
-        env = gym.make(
-            "pygame_ped_env:ped_env-v1",
-            sim_area=window,
-            controllable_sprites=[
-                agent,
-                agentL,
-                # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
-                RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-            ],
+        # env = gym.make(
+        #     "pygame_ped_env:ped_env-v1",
+        #     sim_area=window,
+        #     controllable_sprites=[
+        #         agent,
+        #         agentL,
+        #         # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
+        #         RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
+        #     ],
+        #     headless=False,
+        #     simple_reward=False,
+        #     seed=4321,
+        # )
+        env = RLCrossingSim(
+            window,
+            # [
+            #     agent,
+            #     agentL,
+            #     RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
+            # ],
             headless=False,
-            simple_reward=False,
             seed=4321,
         )
         agent.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)

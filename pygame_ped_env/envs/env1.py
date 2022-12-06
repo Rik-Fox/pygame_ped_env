@@ -22,25 +22,30 @@ class RLCrossingSim(gym.Env):
     def __init__(
         self,
         sim_area,
-        controllable_sprites: Union[None, Sprite, Sequence[Sprite]] = None,
+        scenarioList: Union[None, Sequence[int]] = None,
+        evalu=False,
         headless=False,
         seed=1234,
-        simple_reward=True,
+        static_model: any = None,
         speed_coefficient=1.0,
         position_coefficient=1.0,
         steering_coefficient=1.0,
     ) -> None:
-        assert (
-            2 <= len(controllable_sprites) <= 3
-        ), "Must pass only 2 or 3 sprite entities to RL Crossing env"
+
         super().__init__()
         np.random.seed(seed)
 
         # whether to render or not
         self.headless = headless
 
+        # path to traffic prediction model if used
+        self.modelT = static_model
+
+        self.training = not evalu
+
         # whether to have shaped reward or not
-        self.simple_reward = simple_reward
+        # true by default, scenario will change it in reset()
+        self.simple_reward = True
 
         # reward weightings, used to adjust for repsonse data
         self.speed_coeff = speed_coefficient
@@ -62,30 +67,22 @@ class RLCrossingSim(gym.Env):
         # (8 directions * 3 speeds) + 1 no_op action
         self.action_space = gym.spaces.Discrete(25)
 
-        self.init_sprites = {}
+        init_sprite = Sprite()
+        init_sprite.model = None
+        init_sprite.rect = pygame.Rect(0, 0, 0, 0)
 
-        self.vehicle = GroupSingle()
-        self.traffic = GroupSingle()
-        self.pedestrian = GroupSingle()
+        self.vehicle = GroupSingle(init_sprite)
+        self.traffic = GroupSingle(init_sprite)
+        self.pedestrian = GroupSingle(init_sprite)
 
-        if len(controllable_sprites) == 2:
-            sprite = Sprite()
-            sprite.rect = pygame.Rect(0, 0, 0, 0)
-            self.traffic.add(sprite)
+        if scenarioList is not None:
+            self.scenarioList = scenarioList
+        else:
+            self.scenarioList = [0]
 
-        for i, sprite in enumerate(controllable_sprites):
-            self.init_sprites[sprite] = sprite.rect.copy()
-            if i == 0:
-                self.vehicle.add(sprite)
-            else:
-                if isinstance(sprite, (RLVehicle, KeyboardVehicle)):
-                    self.traffic.add(sprite)
-                elif isinstance(sprite, (RandomPedestrian, KeyboardPedestrian)):
-                    self.pedestrian.add(sprite)
-                else:
-                    raise TypeError(
-                        "Only one or two vehicles and one pedestrian can be passed into this environment",
-                    )
+        self.scenario = lambda: np.random.choice(self.scenarioList)
+
+        self.reset()
 
         self.roads = Group()
         self.generateRoads()
@@ -95,23 +92,6 @@ class RLCrossingSim(gym.Env):
             self.screen = pygame.display.set_mode(self.screen_size)
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
-
-        self.vehicleTypes = {0: "car", 1: "bus", 2: "truck", 3: "bike"}
-        # discrete int action to relative action now converted in agent class
-        # self.directionNumbers = {
-        #     0: "down",
-        #     1: "downleft",
-        #     2: "left",
-        #     3: "upleft",
-        #     4: "up",
-        #     5: "upright",
-        #     6:"right",
-        #     7:"downright",
-        #     }
-
-        # Gap between vehicles
-        # movingGap = 15  # moving gap
-        # self.spacings = {0: -movingGap, 1: -movingGap, 2: movingGap, 3: movingGap}
 
         self.done = False
 
@@ -383,37 +363,65 @@ class RLCrossingSim(gym.Env):
 
     def reset(self):
 
-        self.vehicle.empty()
-        self.traffic.empty()
-        self.pedestrian.empty()
+        scenario = self.scenario_map()[self.scenario()]
 
-        if len([*self.init_sprites.keys()]) == 2:
+        for i, agent in enumerate(scenario["agentSprites"]):
+            if i == 0:
+                if agent[0] == "R":
+                    agentL = RLVehicle.init_from_scenario(agent, self.screen_size)
+                    agentL.model = self.vehicle.sprite.model
+                    self.simple_reward = False
+                elif agent[0] == "S":
+                    agentL = RLVehicle.init_from_scenario(agent[1:])
+                    agentL.model = self.vehicle.sprite.model
+                    self.simple_reward = True
+                else:
+                    agentL = KeyboardVehicle.init_from_scenario(agent, self.screen_size)
+
+                self.vehicle.empty()
+                self.vehicle.add(agentL)
+
+            elif (i > 0) and isinstance(agent, (RLVehicle, KeyboardVehicle)):
+                if agent[0] == "R":
+                    agentT = RLVehicle.init_from_scenario(agent, self.screen_size)
+                    agentT.model = self.modelT
+                    self.simple_reward = False
+                elif agent[0] == "S":
+                    agentT = RLVehicle.init_from_scenario(agent[1:], self.screen_size)
+                    agentT.model = self.modelT
+                    self.simple_reward = True
+                else:
+                    agentT = KeyboardVehicle.init_from_scenario(agent, self.screen_size)
+
+                self.traffic.empty()
+                self.traffic.add(agentT)
+
+        # pad second vehicle in obs if not present
+        if i == 0:
+            self.traffic.empty()
             sprite = Sprite()
             sprite.rect = pygame.Rect(0, 0, 0, 0)
             self.traffic.add(sprite)
 
-        for i, sprite in enumerate([*self.init_sprites.keys()]):
-            if isinstance(sprite, (RLVehicle, KeyboardVehicle)):
-                sprite.rect = self.init_sprites[sprite].copy()
-                if i == 0:
-                    self.vehicle.add(sprite)
-                else:
-                    self.traffic.add(sprite)
-            elif isinstance(sprite, (RandomPedestrian, KeyboardPedestrian)):
-                sprite.rect = self.init_sprites[sprite].copy()
-                # slight noise in pedestrian start position
-                sprite.rect.x, sprite.rect.y = (
-                    sprite.rect.x + (np.random.rand() * 4) - 2,
-                    sprite.rect.y + (np.random.rand() * 4) - 2,
+        # add pedestrian, keyboard for experiment or random if just training or code evalling
+        self.pedestrian.empty()
+        if self.training:
+            self.pedestrian.add(
+                RandomPedestrian(
+                    # add slight noise in pedestrian start position
+                    (self.screen_size[0] / 2) + (np.random.rand() * 4) - 2,
+                    (self.screen_size[1] * (7 / 8)) + (np.random.rand() * 4) - 2,
+                    "up",
                 )
-                self.pedestrian.add(sprite)
-            else:
-                raise TypeError(
-                    "Only controllable Vehicles or Pedestrians can be passed into environment",
+            )
+        else:
+            self.pedestrian.add(
+                KeyboardPedestrian(
+                    self.screen_size[0] / 2, self.screen_size[1] * (7 / 8), "up"
                 )
+            )
 
         if not self.headless:
-            # pygame.quit()
             pygame.init()
             self.screen = pygame.display.set_mode(self.screen_size)
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
@@ -451,3 +459,83 @@ class RLCrossingSim(gym.Env):
 
                 self.render()
         pygame.quit()
+
+    @classmethod
+    def init_scenario(cls, scenario, sim_area, training=False, **kwargs):
+
+        # entities = []
+        # scen = cls.scenario_map()[scenario]
+        # for agent in scen.agentSprites:
+        #     if agent[0] == "H":
+        #         entities.append(RLVehicle.init_from_scenario(agent))
+        #         kwargs["simple_reward"] = False
+        #     elif agent[0] == "S":
+        #         entities.append(RLVehicle.init_from_scenario(agent[1:]))
+        #         kwargs["simple_reward"] = True
+        #     else:
+        #         entities.append(KeyboardVehicle.init_from_scenario(agent))
+
+        # # add pedestrian
+        # if training:
+        #     entities.append(
+        #         RandomPedestrian(sim_area[0] / 2, sim_area[1] * (7 / 8), "up")
+        #     )
+        # else:
+        #     entities.append(
+        #         KeyboardPedestrian(sim_area[0] / 2, sim_area[1] * (7 / 8), "up")
+        #     )
+
+        return (cls(sim_area, cls.scenario_map()[scenario].agentList, **kwargs),)
+
+    @staticmethod
+    def scenario_map():
+        return {
+            0: {
+                "name": "RL_r",
+                "agentSprites": ["RL_right"],
+            },
+            1: {
+                "name": "RL_l",
+                "agentSprites": ["RL_left"],
+            },
+            2: {
+                "name": "RL2_r",
+                "agentSprites": ["RL_right", "RL_left"],
+            },
+            3: {
+                "name": "RL2_l",
+                "agentSprites": ["RL_left", "RL_right"],
+            },
+            4: {
+                "name": "RL_SRL_r",
+                "agentSprites": ["RL_right", "SRL_left"],
+            },
+            5: {
+                "name": "RL_SRL_l",
+                "agentSprites": ["RL_left", "SRL_right"],
+            },
+            5: {
+                "name": "RL_H_r",
+                "agentSprites": ["RL_right", "H_left"],
+            },
+            5: {
+                "name": "RL_H_l",
+                "agentSprites": ["RL_left", "H_right"],
+            },
+            2: {
+                "name": "1SRL",
+                "agentSprites": ["SRL_right"],
+            },
+            3: {
+                "name": "2SRL",
+                "agentSprites": ["SRL_right", "SRL_left"],
+            },
+            4: {
+                "name": "1H",
+                "agentSprites": ["H_right"],
+            },
+            5: {
+                "name": "2RL",
+                "agentSprites": ["RL_right", "RL_left"],
+            },
+        }

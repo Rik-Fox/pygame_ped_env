@@ -9,7 +9,9 @@ import numpy as np
 
 class RLVehicle(Vehicle):
     # class for hooking in RL algorithms
-    def __init__(self, window_size, vehicleClass, direction, *groups: AbstractGroup):
+    def __init__(
+        self, window_size, vehicleClass: str, direction: str, *groups: AbstractGroup
+    ) -> None:
 
         if direction == "right":
             start = [0, window_size[1] / 2]
@@ -78,10 +80,28 @@ class RLVehicle(Vehicle):
         else:
             pass
 
+    @classmethod
+    def init_from_scenario(cls, scenario: str, window_size):
+        if scenario == ("RL_left" or "SRL_left"):
+            return cls(window_size, "car", "left")
+        else:
+            return cls(window_size, "car", "right")
+
 
 class RandomVehicle(Vehicle):
-    def __init__(self, x, y, init_direction, *groups: AbstractGroup) -> None:
-        super().__init__(x, y, init_direction, *groups)
+    def __init__(
+        self, window_size, vehicleClass: str, direction: str, *groups: AbstractGroup
+    ) -> None:
+        if direction == "right":
+            start = [0, window_size[1] / 2]
+        elif direction == "left":
+            start = [window_size[0], window_size[1] / 2]
+        else:
+            raise AttributeError(
+                'Only "left" and "right" directions are implemented for vehicles'
+            )
+
+        super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
 
     def update(self):
 
@@ -114,8 +134,19 @@ class RandomVehicle(Vehicle):
 
 
 class KeyboardVehicle(Vehicle):
-    def __init__(self, x, y, init_direction, *groups: AbstractGroup) -> None:
-        super().__init__(x, y, init_direction, *groups)
+    def __init__(
+        self, window_size, vehicleClass: str, direction: str, *groups: AbstractGroup
+    ) -> None:
+        if direction == "right":
+            start = [0, window_size[1] / 2]
+        elif direction == "left":
+            start = [window_size[0], window_size[1] / 2]
+        else:
+            raise AttributeError(
+                'Only "left" and "right" directions are implemented for vehicles'
+            )
+
+        super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
 
     def update(self):
         assert pygame.get_init(), "Keyboard agent cannot be used while headless"
@@ -134,6 +165,13 @@ class KeyboardVehicle(Vehicle):
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.rect.x -= self.speed
             self.animate("left")
+
+    @classmethod
+    def init_from_scenario(cls, scenario: str, window_size):
+        if scenario == "H_left":
+            return cls(window_size, "car", "left")
+        else:
+            return cls(window_size, "car", "right")
 
 
 class RandomPedestrian(Pedestrian):
