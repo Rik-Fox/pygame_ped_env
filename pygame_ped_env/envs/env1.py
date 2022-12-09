@@ -304,14 +304,15 @@ class RLCrossingSim(gym.Env):
 
     def step(self, action):
 
-        self.vehicle.sprite.act(action)
+        # self.vehicle.sprite.act(action)
+        self.vehicle.sprite.act([[6], None])
 
         self.traffic.sprite.update(self.traffic_action)
         try:
             self.pedestrian.sprite.update()
         except:
             self.pedestrian.add(Sprite())
-            self.pedestrian.rect = pygame.Rect(0, 0, 0, 0)
+            self.pedestrian.sprite.rect = pygame.Rect(0, 0, 0, 0)
 
         if not self.headless:
             self.render()
@@ -361,7 +362,11 @@ class RLCrossingSim(gym.Env):
         self.screen.blit(self.background, (0, 0))  # display background in simulation
         self.roads.draw(self.screen)
         self.vehicle.draw(self.screen)
-        self.pedestrian.draw(self.screen)
+
+        try:
+            self.pedestrian.draw(self.screen)
+        except:
+            pass
 
         try:
             self.traffic.draw(self.screen)
