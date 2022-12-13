@@ -1,5 +1,4 @@
 import time
-import threading
 import pygame
 import sys
 import os
@@ -25,10 +24,11 @@ class RLCrossingSim(gym.Env):
         sim_area,
         scenarioList: Union[None, Sequence[int]] = None,
         human_controlled_ped=False,
+        human_controlled_car=False,
         headless=False,
         seed=1234,
-        learning_model: any = None,
-        fixed_model: any = None,
+        basic_model: any = None,
+        attr_model: any = None,
         log_path=None,
         speed_coefficient=1.0,
         position_coefficient=1.0,
@@ -37,6 +37,8 @@ class RLCrossingSim(gym.Env):
 
         super().__init__()
         np.random.seed(seed)
+
+        self.log_path = log_path
 
         # whether to render or not
         self.headless = headless
@@ -62,8 +64,10 @@ class RLCrossingSim(gym.Env):
         self.observation_space = gym.spaces.Box(
             low=-150, high=self.sim_area_x + 150, shape=(12,)
         )
+
         # (8 directions * 3 speeds) + 1 no_op action
         self.action_space = gym.spaces.Discrete(25)
+        self.action_space.seed(seed)
 
         init_sprite = Sprite()
         init_sprite.model = None
@@ -89,26 +93,58 @@ class RLCrossingSim(gym.Env):
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
 
-        if not learning_model:
-            learning_model = DQN("MlpPolicy", self, verbose=0, tensorboard_log=log_path)
-            modelL_path = os.path.join(log_path, "DQN_model")
-            learning_model.save(modelL_path, include="env")
+        if not basic_model:
+            modelB_path = os.path.join(
+                os.path.dirname(self.log_path), "simple_reward_agent", "init_model"
+            )
+            try:
+                self.modelB = DQN.load(modelB_path, env=self)
+            except:
+                basic_model = DQN(
+                    "MlpPolicy",
+                    self,
+                    verbose=0,
+                    tensorboard_log=os.path.join(
+                        os.path.dirname(self.log_path), "simple_reward_agent"
+                    ),
+                )
+                basic_model._setup_model()
+                basic_model.save(modelB_path, include="env")
+
+                self.modelB = DQN.load(modelB_path, env=self)
         else:
-            modelL_path = learning_model
+            self.modelB = DQN.load(basic_model, env=self)
 
-        self.modelL = DQN.load(os.path.join(modelL_path))
-
-        if fixed_model:
-            learning_model = DQN.load(fixed_model)
-
-        # path to traffic prediction model if used
-        self.modelF = fixed_model
+        if not attr_model:
+            modelA_path = os.path.join(
+                os.path.dirname(self.log_path), "shaped_reward_agent", "init_model"
+            )
+            try:
+                self.modelA = DQN.load(modelA_path, env=self)
+            except:
+                attr_model = DQN(
+                    "MlpPolicy",
+                    self,
+                    verbose=0,
+                    tensorboard_log=os.path.join(
+                        os.path.dirname(self.log_path), "shaped_reward_agent"
+                    ),
+                )
+                attr_model.save(modelA_path, include="env")
+                self.modelA = DQN.load(modelA_path, env=self)
+        else:
+            self.modelA = DQN.load(attr_model, env=self)
 
         self.training = not human_controlled_ped
 
-        # self.reset()
+        self.H_collect = human_controlled_car
 
-        # self.done = False
+    def get_max_reward(self, simple_reward=False):
+        # highest possible reward for both cases
+        if simple_reward:
+            return (0.03 * (self.sim_area_x / 3)) * 2
+        else:
+            return np.sum(np.array(range(0, self.sim_area_x, 3)) / self.sim_area_x) * 2
 
     def generateBackground(self):
         # Setting background image and scaling to window size
@@ -217,7 +253,7 @@ class RLCrossingSim(gym.Env):
         # if we have reached the destination, give max rwd
         if (curr_d_obj == np.zeros(2)).all():
             # rwd for hitting goal
-            rwd = 1000
+            rwd = self.get_max_reward(self.simple_reward)
             done = True
         else:
             rwd = -0.04 + on_road
@@ -243,7 +279,7 @@ class RLCrossingSim(gym.Env):
         # if we have reached the destination, give max rwd
         if (curr_d_obj == np.zeros(2)).all():
             # rwd for hitting goal
-            position_rwd = 1
+            position_rwd = self.get_max_reward(self.simple_reward)
             done = True
         else:
             # straight line vector from start to goal
@@ -304,10 +340,12 @@ class RLCrossingSim(gym.Env):
 
     def step(self, action):
 
-        # self.vehicle.sprite.act(action)
-        self.vehicle.sprite.act([[6], None])
+        self.vehicle.sprite.act(action)
+        # self.vehicle.sprite.act([[6], None]) # just move right for testing without trained model
 
         self.traffic.sprite.update(self.traffic_action)
+
+        # add placeholder ped if its gone offscreen and been removed
         try:
             self.pedestrian.sprite.update()
         except:
@@ -333,29 +371,46 @@ class RLCrossingSim(gym.Env):
 
         # remove vehicles once they drive offscreen and finish episode
         if not self.done:
-            if not (0 <= self.vehicle.sprite.rect.centery <= self.sim_area_y):
+            veh_rect = self.vehicle.sprite.rect
+            if not (0 - veh_rect.h <= veh_rect.centery <= self.sim_area_y + veh_rect.h):
                 # if not roughly at destination then punish
                 if not (
                     self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
                 ).all():
-                    rwd -= 1000
-                self.vehicle.remove(self.vehicle.sprite)
+                    rwd -= 3000
                 self.done = True
-            elif not (0 <= self.vehicle.sprite.rect.centerx <= self.sim_area_x):
+            elif not (
+                0 - veh_rect.w <= veh_rect.centerx <= self.sim_area_x + veh_rect.w
+            ):
                 # if not roughly at destination then punish
                 if not (
                     self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
                 ).all():
-                    rwd -= 1000
-                self.vehicle.remove(self.vehicle.sprite)
+                    rwd -= 3000
                 self.done = True
 
-        if not self.done:
-            if not (0 <= self.pedestrian.sprite.rect.y <= self.sim_area_y):
-                self.pedestrian.remove(self.pedestrian.sprite)
-            elif not (0 <= self.pedestrian.sprite.rect.x <= self.sim_area_x):
-                self.pedestrian.remove(self.pedestrian.sprite)
-
+            # if vehicle not done, check for ped offscreen
+            if not self.done:
+                ped_rect = self.pedestrian.sprite.rect
+                if not (
+                    0 - ped_rect.h <= ped_rect.centery <= self.sim_area_y + ped_rect.h
+                ):
+                    self.pedestrian.remove(self.pedestrian.sprite)
+                elif not (
+                    0 - ped_rect.w <= ped_rect.centerx <= self.sim_area_y + ped_rect.w
+                ):
+                    self.pedestrian.remove(self.pedestrian.sprite)
+        else:
+            try:
+                if self.traffic.sprite.replay:
+                    self.traffic.sprite.save(
+                        os.path.join(
+                            self.log_path,
+                            f"{self.scenarioName}_human_trajectory_{np.random.randint(5)}",
+                        )
+                    )
+            except:
+                pass
         return obs, rwd, self.done, {}
 
     def render(self):
@@ -383,21 +438,31 @@ class RLCrossingSim(gym.Env):
         time.sleep(0.016)
 
     def reset(self):
-        self.vehicle.empty()
         scenario = self.scenario_map()[self.scenario()]
+        self.scenarioName = scenario["name"]
 
+        self.vehicle.empty()
         agent = scenario["agentSprites"][0]
         if agent[0] == "R":
             agentL = RLVehicle.init_from_scenario(agent, self.screen_size)
-            agentL.model = self.modelL
+            agentL.model = self.modelA
             self.simple_reward = False
         elif agent[0] == "S":
             agentL = RLVehicle.init_from_scenario(agent[1:], self.screen_size)
-            agentL.model = self.modelL
+            agentL.model = self.modelB
             self.simple_reward = True
         else:
-            agentL = KeyboardVehicle.init_from_scenario(agent, self.screen_size)
+            if self.training:
+                load_path = os.path.join(
+                    self.log_path,
+                    f"{self.scenarioName}_human_trajectory_{np.random.randint(5)}",
+                )
+            agentL = KeyboardVehicle.init_from_scenario(
+                agent, self.screen_size, load_path=None
+            )
+            agentL.model = None
 
+        self.modelL = agentL.model
         self.vehicle.add(agentL)
 
         self.traffic.empty()
@@ -405,28 +470,29 @@ class RLCrossingSim(gym.Env):
             traffic_agent = scenario["agentSprites"][1]
 
             if traffic_agent[0] == "R":
-                agentF = RLVehicle.init_from_scenario(traffic_agent, self.screen_size)
-                agentF.model = self.modelF
-                self.simple_reward = False
+                agentT = RLVehicle.init_from_scenario(traffic_agent, self.screen_size)
+                agentT.model = self.modelA
             elif traffic_agent[0] == "S":
-                agentF = RLVehicle.init_from_scenario(
+                agentT = RLVehicle.init_from_scenario(
                     traffic_agent[1:], self.screen_size
                 )
-                agentF.model = self.modelF
-                self.simple_reward = True
+                agentT.model = self.modelB
             else:
-                agentF = KeyboardVehicle.init_from_scenario(
+                agentT = KeyboardVehicle.init_from_scenario(
                     traffic_agent, self.screen_size
                 )
+                agentT.model = None
         except:
-            agentF = Sprite()
-            agentF.rect = pygame.Rect(0, 0, 0, 0)
+            agentT = Sprite()
+            agentT.rect = pygame.Rect(0, 0, 0, 0)
+            agentT.model = None
 
-        self.traffic.add(agentF)
+        self.modelT = agentT.model
+        self.traffic.add(agentT)
 
         # add pedestrian, keyboard for experiment or random if just training or code evalling
         self.pedestrian.empty()
-        if self.training:
+        if self.training or self.H_collect:
             self.pedestrian.add(
                 RandomPedestrian(
                     # add slight noise in pedestrian start position
@@ -535,28 +601,56 @@ class RLCrossingSim(gym.Env):
                 "name": "RL_SRL_l",
                 "agentSprites": ["RL_left", "SRL_right"],
             },
-            5: {
+            6: {
                 "name": "RL_H_r",
                 "agentSprites": ["RL_right", "H_left"],
             },
-            5: {
+            7: {
                 "name": "RL_H_l",
                 "agentSprites": ["RL_left", "H_right"],
             },
-            6: {
-                "name": "1SRL",
+            8: {
+                "name": "SRL_r",
                 "agentSprites": ["SRL_right"],
             },
-            7: {
-                "name": "2SRL",
+            9: {
+                "name": "SRL_l",
+                "agentSprites": ["SRL_left"],
+            },
+            10: {
+                "name": "SRL2_r",
                 "agentSprites": ["SRL_right", "SRL_left"],
             },
-            8: {
-                "name": "1H",
+            11: {
+                "name": "SRL2_l",
+                "agentSprites": ["SRL_left", "SRL_right"],
+            },
+            12: {
+                "name": "SRL_RL_r",
+                "agentSprites": ["SRL_right", "RL_left"],
+            },
+            13: {
+                "name": "SRL_RL_l",
+                "agentSprites": ["SRL_left", "RL_right"],
+            },
+            14: {
+                "name": "SRL_H_r",
+                "agentSprites": ["SRL_right", "H_left"],
+            },
+            15: {
+                "name": "SRL_H_l",
+                "agentSprites": ["SRL_left", "H_right"],
+            },
+            16: {
+                "name": "H_r",
                 "agentSprites": ["H_right"],
             },
-            9: {
-                "name": "2RL",
-                "agentSprites": ["RL_right", "RL_left"],
+            17: {
+                "name": "H_l",
+                "agentSprites": ["H_left"],
+            },
+            18: {
+                "name": "H2",
+                "agentSprites": ["H_right", "H_left"],
             },
         }

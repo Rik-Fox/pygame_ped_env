@@ -17,70 +17,43 @@ from custom_logging import CustomTrackingCallback
 
 class Eval:
 
+    # (A) attribute based reward agent
+    attr_save_path = "shaped_reward_agent"
+    train_setA = [*range(0, 8)]
+
+    # (B) basic reward agent
+    basic_save_path = "simple_reward_agent"
+    train_setB = [*range(8, 16)]
+
+    # these varibles select which model
+    # and it's appropriate scenarios to train
+    model_path = attr_save_path
+    scenarios = train_setA
+
     log_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "logs",
         "eval_logs",
+        model_path,
         # time.asctime(),
     )
-    # print("log_path => ",str(log_path))
 
-    window = (720, 576)
+    env = RLCrossingSim(
+        window=(1280, 720),
+        scenarioList=scenarios,
+        human_controlled_ped=False,
+        human_controlled_car=False,
+        headless=False,
+        seed=4321,
+        simple_model=basic_save_path,
+        attr_model=attr_save_path,
+        log_path=log_path,
+        speed_coefficient=1.0,
+        position_coefficient=1.0,
+        steering_coefficient=1.0,
+    )
 
-    agent = RLVehicle(window, "car", "right")
-    agentL = RLVehicle(window, "car", "left")
-
-    model_save_path = None
-
-    if model_save_path:
-        agent.model = DQN.load(os.path.join(model_save_path, "best"))
-
-    try:
-        env = agent.model.get_env()
-        if env is None:
-            agent.model.set_env(
-                gym.make(
-                    "pygame_ped_env:ped_env-v1",
-                    sim_area=window,
-                    controllable_sprites=[
-                        agent,
-                        agentL,
-                        # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
-                        RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-                    ],
-                    headless=False,
-                    simple_reward=False,
-                    seed=4321,
-                )
-            )
-            env = agent.model.get_env()
-
-    except AttributeError:
-        # env = gym.make(
-        #     "pygame_ped_env:ped_env-v1",
-        #     sim_area=window,
-        #     controllable_sprites=[
-        #         agent,
-        #         agentL,
-        #         # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
-        #         RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-        #     ],
-        #     headless=False,
-        #     simple_reward=False,
-        #     seed=4321,
-        # )
-        env = RLCrossingSim(
-            window,
-            scenarioList=[2],
-            headless=False,
-            seed=4321,
-            log_path=log_path,
-            # learning_model=os.path.join(model_save_path, "best"),
-            learning_model=None,
-            fixed_model=None,
-        )
-
-    n_episodes = 6
+    n_episodes = 10
 
     for ep in range(n_episodes):
         obs = env.reset()

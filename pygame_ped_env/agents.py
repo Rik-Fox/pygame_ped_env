@@ -5,6 +5,7 @@ from pygame_ped_env.spritesheet import SpriteSheet
 from pygame_ped_env.customsprites import Vehicle, Pedestrian
 
 import numpy as np
+import pickle
 
 
 class RLVehicle(Vehicle):
@@ -25,7 +26,10 @@ class RLVehicle(Vehicle):
             )
 
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
-
+        if direction == "right":
+            self.rect.centerx + np.array(self.rect.size[0])
+        elif direction == "left":
+            self.rect.centerx - np.array(self.rect.size[0])
         start = self.rect.center
         # ensure goal is centred in lane after car sprite position is adjusted in super
         end[1] = start[1]
@@ -61,9 +65,13 @@ class RLVehicle(Vehicle):
             return np.abs(self.rect.center - self.objective)
 
     def act(self, action):
+        if isinstance(action, np.int32):
+            pass
+        else:
+            action = action[0][0]
+
         mapped_action = (
-            self.action_map[action[0][0] % 8]
-            * self.speed_map[np.floor(action[0][0] / 8)]
+            self.action_map[action % 8] * self.speed_map[np.floor(action / 8)]
         )
         self.rect.center += mapped_action
         self.moved.append(mapped_action)
@@ -71,9 +79,13 @@ class RLVehicle(Vehicle):
     def update(self, action=None):  # for non learning agent
         # self.rect.center += np.array([-1, 0]) # just move left
         if action:
+            if isinstance(action, np.int32):
+                pass
+            else:
+                action = action[0][0]
+
             mapped_action = (
-                self.action_map[action[0][0] % 8]
-                * self.speed_map[np.floor(action[0][0] / 8)]
+                self.action_map[action % 8] * self.speed_map[np.floor(action / 8)]
             )
             self.rect.center += mapped_action
             self.moved.append(mapped_action)
@@ -135,7 +147,12 @@ class RandomVehicle(Vehicle):
 
 class KeyboardVehicle(Vehicle):
     def __init__(
-        self, window_size, vehicleClass: str, direction: str, *groups: AbstractGroup
+        self,
+        window_size,
+        vehicleClass: str,
+        direction: str,
+        load_path=None,
+        *groups: AbstractGroup
     ) -> None:
         if direction == "right":
             start = [0, window_size[1] / 2]
@@ -148,30 +165,64 @@ class KeyboardVehicle(Vehicle):
 
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
 
-    def update(self):
-        assert pygame.get_init(), "Keyboard agent cannot be used while headless"
+        self.actionHistory = []
+        self.replay = False
+        if load_path:
+            self.load(load_path)
 
-        keys = pygame.key.get_pressed()
+    def update(self, action=None):
+        if self.replay and action:
+            # place holder need to implement reading in keyboard trajectories
+            if isinstance(action, np.int32):
+                pass
+            else:
+                action = action[0][0]
 
-        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            self.rect.y += self.speed
-            self.animate("down")
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
-            self.rect.y -= self.speed
-            self.animate("up")
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            self.rect.x += self.speed
-            self.animate("right")
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            self.rect.x -= self.speed
-            self.animate("left")
+            mapped_action = (
+                self.action_map[action % 8] * self.speed_map[np.floor(action / 8)]
+            )
+            self.rect.center += mapped_action
+            self.moved.append(mapped_action)
+
+        elif self.replay:
+            pass
+        else:
+            assert pygame.get_init(), "Keyboard agent cannot be used while headless"
+
+            keys = pygame.key.get_pressed()
+
+            if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+                self.rect.y += self.speed
+                self.actionHistory.append("down")
+                self.animate("down")
+            if keys[pygame.K_UP] or keys[pygame.K_w]:
+                self.rect.y -= self.speed
+                self.actionHistory.append("up")
+                self.animate("up")
+            if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+                self.rect.x += self.speed
+                self.actionHistory.append("right")
+                self.animate("right")
+            if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+                self.rect.x -= self.speed
+                self.actionHistory.append("left")
+                self.animate("left")
+
+    def save(self, file):
+        with open(file, "wb") as filePath:
+            pickle.dump(self.actionHistory, filePath)
+
+    def load(self, file):
+        with open(file, "rb") as filePath:
+            self.actionHistory = pickle.load(filePath)
+        self.replay = True
 
     @classmethod
-    def init_from_scenario(cls, scenario: str, window_size):
+    def init_from_scenario(cls, scenario: str, window_size, **kwargs):
         if scenario == "H_left":
-            return cls(window_size, "car", "left")
+            return cls(window_size, "car", "left", **kwargs)
         else:
-            return cls(window_size, "car", "right")
+            return cls(window_size, "car", "right", **kwargs)
 
 
 class RandomPedestrian(Pedestrian):

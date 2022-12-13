@@ -1,123 +1,203 @@
 # from env import TrafficSim
 import time
 import os
-from pygame_ped_env.agents import (
-    RLVehicle,
-    KeyboardPedestrian,
-    RandomPedestrian,
-)  # , Road
-from stable_baselines3 import DQN
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.env_util import make_vec_env
-import gym
-
+import numpy as np
+from pygame_ped_env.envs import RLCrossingSim
 from custom_logging import CustomTrackingCallback
+from stable_baselines3 import DQN
+from stable_baselines3.common.env_util import make_vec_env
+import stable_baselines3.common.callbacks as clbks
+
+
+#     EvalCallback,
+#     StopTrainingOnMaxEpisodes,
+#     StopTrainingOnNoModelImprovement,
+#     StopTrainingOnRewardThreshold,
+#     EveryNTimesteps,
+#     CheckpointCallback,
+#     CallbackList,
 
 
 class Main:
+    ### IMPORTANT ###
+    # must use correct scenario set otherwise will be updated
+    # for rewards recieved by other models actions
+    # model_path = "shaped_reward_agent"
+    # model_path = "simple_reward_agent"
+    simple_agent = True
+    # these varibles select which model
+    # and it's appropriate scenarios to train
+    if not simple_agent:
+        # (A) attribute based reward agent
+        model_path = "shaped_reward_agent"
+        simple_reward = True
+        scenarios = [*range(0, 8)]
+    else:
+        # (B) basic reward agent
+        model_path = "simple_reward_agent"
+        simple_reward = True
+        scenarios = [*range(8, 16)]
 
-    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-    # print("log_path => ",str(log_path))
+    log_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "logs",
+        model_path,
+    )
 
-    window = (720, 576)
+    window = (1280, 720)
+    n_envs = 10
+    n_episodes = 1e6
 
-    agent = RLVehicle([0, window[1] / 2], [window[0], window[1] / 2], "car", "right")
-
-    # env = Monitor(
-    #     gym.make(
-    #         "pygame_ped_env:ped_env-v1",
-    #         sim_area=window,
-    #         controllable_sprites=[
-    #             agent,
-    #             # KeyboardPedestrian(window[0] / 2, window[1] * (3 / 4), "up"),
-    #             RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-    #         ],
-    #         headless=True,
-    #         seed=1234,
+    # base_env = RLCrossingSim(
+    #     window,
+    #     scenarioList=scenarios,
+    #     human_controlled_ped=False,  # must be False in training
+    #     human_controlled_car=False,  # must be False if headless = True
+    #     headless=True,
+    #     seed=4321,
+    #     basic_model=os.path.join(
+    #         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    #         "logs",
+    #         "simple_reward_agent",
+    #         "init_model",
     #     ),
-    #     log_path,
+    #     attr_model=os.path.join(
+    #         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    #         "logs",
+    #         "shaped_reward_agent",
+    #         "init_model",
+    #     ),
+    #     log_path=log_path,
+    #     speed_coefficient=1.0,
+    #     position_coefficient=1.0,
+    #     steering_coefficient=1.0,
     # )
+
+    # modelB_path = os.path.join(
+    #     os.path.dirname(self.log_path), "simple_reward_agent", "init_model"
+    # )
+    # try:
+    #     x = DQN.load(modelB_path, env=self)
+    # except:
+    #     basic_model = DQN(
+    #         "MlpPolicy",
+    #         self,
+    #         verbose=0,
+    #         tensorboard_log=os.path.join(
+    #             os.path.dirname(self.log_path), "simple_reward_agent"
+    #         ),
+    #     )
+    #     basic_model._setup_model()
+    #     basic_model.save(modelB_path, include="env")
+
+    #     self.modelB = DQN.load(modelB_path, env=self)
+
     env = make_vec_env(
-        "pygame_ped_env:ped_env-v1",
-        10,
+        RLCrossingSim,
+        n_envs,
         env_kwargs={
-            "sim_area": window,
-            "controllable_sprites": [
-                agent,
-                RandomPedestrian(window[0] / 2, window[1] * (7 / 8), "up"),
-            ],
+            "sim_area": (1280, 720),
+            "scenarioList": scenarios,
+            "human_controlled_ped": False,  # must be False in training
+            "human_controlled_car": False,  # must be False if headless : True
             "headless": True,
+            "seed": 4321,
+            "basic_model": os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "logs",
+                "simple_reward_agent",
+                "init_model",
+            ),
+            "attr_model": os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "logs",
+                "shaped_reward_agent",
+                "init_model",
+            ),
+            "log_path": log_path,
+            "speed_coefficient": 1.0,
+            "position_coefficient": 1.0,
+            "steering_coefficient": 1.0,
         },
-        seed=1234,
+        seed=4321,
         monitor_dir=log_path,
     )
-
-    n_episodes = 1e6
     env.reset()
 
-    # def __init__(
-    #     self,
-    #     policy: Union[str, Type[DQNPolicy]],
-    #     env: Union[GymEnv, str],
-    #     learning_rate: Union[float, Schedule] = 1e-4,
-    #     buffer_size: int = 1_000_000,  # 1e6
-    #     learning_starts: int = 50000,
-    #     batch_size: int = 32,
-    #     tau: float = 1.0,
-    #     gamma: float = 0.99,
-    #     train_freq: Union[int, Tuple[int, str]] = 4,
-    #     gradient_steps: int = 1,
-    #     replay_buffer_class: Optional[ReplayBuffer] = None,
-    #     replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
-    #     optimize_memory_usage: bool = False,
-    #     target_update_interval: int = 10000,
-    #     exploration_fraction: float = 0.1,
-    #     exploration_initial_eps: float = 1.0,
-    #     exploration_final_eps: float = 0.05,
-    #     max_grad_norm: float = 10,
-    #     tensorboard_log: Optional[str] = None,
-    #     create_eval_env: bool = False,
-    #     policy_kwargs: Optional[Dict[str, Any]] = None,
-    #     verbose: int = 0,
-    #     seed: Optional[int] = None,
-    #     device: Union[th.device, str] = "auto",
-    #     _init_setup_model: bool = True,
-    # )
+    # env.modelL.set_env(env)
 
-    agent.model = DQN("MlpPolicy", env, verbose=0, tensorboard_log=log_path)
-
-    # def learn(
-    #     self,
-    #     total_timesteps: int,
-    #     callback: MaybeCallback = None,
-    #     log_interval: int = 4,
-    #     eval_env: Optional[GymEnv] = None,
-    #     eval_freq: int = -1,
-    #     n_eval_episodes: int = 5,
-    #     tb_log_name: str = "DQN",
-    #     eval_log_path: Optional[str] = None,
-    #     reset_num_timesteps: bool = True,
-    # )
-
-    agent.model.learn(
-        total_timesteps=25,
-        tb_log_name="DQN_testing",
-        callback=CustomTrackingCallback(
-            check_freq=1000,
-            monitor_dir=log_path,
-            start_time=time.time(),
-            verbose=1,
-        ),
+    eval_env = make_vec_env(
+        RLCrossingSim,
+        1,
+        env_kwargs={
+            "sim_area": (1280, 720),
+            "scenarioList": scenarios,
+            "human_controlled_ped": False,  # must be False in training
+            "human_controlled_car": False,  # must be False if headless : True
+            "headless": True,
+            "seed": 4321,
+            "basic_model": os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "logs",
+                "simple_reward_agent",
+                "init_model",
+            ),
+            "attr_model": os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "logs",
+                "shaped_reward_agent",
+                "init_model",
+            ),
+            "log_path": log_path,
+            "speed_coefficient": 1.0,
+            "position_coefficient": 1.0,
+            "steering_coefficient": 1.0,
+        },
     )
 
-    # for ep in range(n_episodes):
-    #     obs = env.reset()
-    #     done = False
-    #     while not done:
-    #         obs, reward, done, info = env.step(agent.model.predict(obs))
-    # env.run()
+    callbacks = clbks.CallbackList(
+        [
+            clbks.EveryNTimesteps(
+                1000 * n_envs,
+                CustomTrackingCallback(
+                    monitor_dir=log_path,
+                ),
+            ),
+            clbks.CheckpointCallback(
+                int(1e5),
+                os.path.join(log_path, "checkpoints"),
+                name_prefix="model_at",
+                verbose=1,
+            ),
+            clbks.StopTrainingOnMaxEpisodes(n_episodes, verbose=1),
+            clbks.EvalCallback(
+                eval_env=eval_env,
+                callback_after_eval=clbks.StopTrainingOnNoModelImprovement(
+                    max_no_improvement_evals=int(1e4), min_evals=int(1e5), verbose=1
+                ),
+                callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
+                    reward_threshold=(
+                        eval_env.envs[0].get_max_reward(simple_reward) / 2
+                    )
+                    * 0.98
+                ),
+                n_eval_episodes=5,
+                eval_freq=int(1e4),
+                log_path=log_path,
+                best_model_save_path=os.path.join(log_path, "best"),
+                render=False,
+                verbose=1,
+            ),
+        ],
+    )
 
-    agent.model.save("./logs/test_model", include="env")
+    env.envs[0].modelL.learn(
+        total_timesteps=450 * n_episodes,
+        tb_log_name="tb_logs",
+        callback=callbacks,
+    )
+
+    # env.modelL.save(os.path.join(log_path, "final_model"), include="env")
 
 
 if __name__ == "__main__":

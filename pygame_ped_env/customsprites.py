@@ -85,7 +85,7 @@ class Vehicle(Sprite):
     def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
 
         speeds = {
-            "car": 3.25,
+            "car": 3,
             "bus": 1.8,
             "truck": 1.8,
             "bike": 2.5,
