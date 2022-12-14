@@ -48,50 +48,6 @@ class Main:
     n_envs = 10
     n_episodes = 1e6
 
-    # base_env = RLCrossingSim(
-    #     window,
-    #     scenarioList=scenarios,
-    #     human_controlled_ped=False,  # must be False in training
-    #     human_controlled_car=False,  # must be False if headless = True
-    #     headless=True,
-    #     seed=4321,
-    #     basic_model=os.path.join(
-    #         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    #         "logs",
-    #         "simple_reward_agent",
-    #         "init_model",
-    #     ),
-    #     attr_model=os.path.join(
-    #         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    #         "logs",
-    #         "shaped_reward_agent",
-    #         "init_model",
-    #     ),
-    #     log_path=log_path,
-    #     speed_coefficient=1.0,
-    #     position_coefficient=1.0,
-    #     steering_coefficient=1.0,
-    # )
-
-    # modelB_path = os.path.join(
-    #     os.path.dirname(self.log_path), "simple_reward_agent", "init_model"
-    # )
-    # try:
-    #     x = DQN.load(modelB_path, env=self)
-    # except:
-    #     basic_model = DQN(
-    #         "MlpPolicy",
-    #         self,
-    #         verbose=0,
-    #         tensorboard_log=os.path.join(
-    #             os.path.dirname(self.log_path), "simple_reward_agent"
-    #         ),
-    #     )
-    #     basic_model._setup_model()
-    #     basic_model.save(modelB_path, include="env")
-
-    #     self.modelB = DQN.load(modelB_path, env=self)
-
     env = make_vec_env(
         RLCrossingSim,
         n_envs,
