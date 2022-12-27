@@ -65,7 +65,7 @@ class RLVehicle(Vehicle):
             return np.abs(self.rect.center - self.objective)
 
     def act(self, action):
-        if isinstance(action, np.int32):
+        if isinstance(action, np.integer):
             pass
         else:
             action = action[0][0]
@@ -91,6 +91,14 @@ class RLVehicle(Vehicle):
             self.moved.append(mapped_action)
         else:
             self.rect.center += np.array([-1, 0])  # just move left
+
+    def save(self, file):
+        with open(file, "wb") as filePath:
+            pickle.dump(self.moved, filePath)
+
+    # def load(self, file):
+    #     with open(file, "rb") as filePath:
+    #         self.moved = pickle.load(filePath)
 
     @classmethod
     def init_from_scenario(cls, scenario: str, window_size):
@@ -154,24 +162,27 @@ class KeyboardVehicle(Vehicle):
         load_path=None,
         *groups: AbstractGroup
     ) -> None:
-        if direction == "right":
+        self.direction = direction
+        if self.direction == "right":
             start = [0, window_size[1] / 2]
-        elif direction == "left":
+            start_offset = 100
+        elif self.direction == "left":
             start = [window_size[0], window_size[1] / 2]
+            start_offset = -100
         else:
             raise AttributeError(
                 'Only "left" and "right" directions are implemented for vehicles'
             )
 
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
-
-        self.actionHistory = []
+        self.rect.x += start_offset
+        self.moved = [np.array([0, 0])]
         self.replay = False
         if load_path:
             self.load(load_path)
 
     def update(self, action=None):
-        if self.replay and action:
+        if action:
             # place holder need to implement reading in keyboard trajectories
             if isinstance(action, np.int32):
                 pass
@@ -185,36 +196,55 @@ class KeyboardVehicle(Vehicle):
             self.moved.append(mapped_action)
 
         elif self.replay:
-            pass
+            try:
+                action = self.actionHistory.pop(0)
+                self.rect.center += mapped_action
+            except:
+                if self.direction == "down":
+                    self.rect.y += self.speed
+                    # self.animate("down")
+                if self.direction == "up":
+                    self.rect.y -= self.speed
+                    # self.animate("up")
+                if self.direction == "right":
+                    self.rect.x += self.speed
+                    # self.animate("right")
+                if self.direction == "left":
+                    self.rect.x -= self.speed
+                    # self.animate("left")
         else:
             assert pygame.get_init(), "Keyboard agent cannot be used while headless"
 
             keys = pygame.key.get_pressed()
 
+            # pad moved for no input steps
+            if not any(keys):
+                self.moved.append(np.array([0, 0]))
+
             if keys[pygame.K_DOWN] or keys[pygame.K_s]:
                 self.rect.y += self.speed
-                self.actionHistory.append("down")
-                self.animate("down")
+                self.moved.append(np.array([0, 1]))
+                # self.animate("down")
             if keys[pygame.K_UP] or keys[pygame.K_w]:
                 self.rect.y -= self.speed
-                self.actionHistory.append("up")
-                self.animate("up")
+                self.moved.append(np.array([0, -1]))
+                # self.animate("up")
             if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
                 self.rect.x += self.speed
-                self.actionHistory.append("right")
-                self.animate("right")
+                self.moved.append(np.array([1, 0]))
+                # self.animate("right")
             if keys[pygame.K_LEFT] or keys[pygame.K_a]:
                 self.rect.x -= self.speed
-                self.actionHistory.append("left")
-                self.animate("left")
+                self.moved.append(np.array([-1, 0]))
+                # self.animate("left")
 
     def save(self, file):
-        with open(file, "wb") as filePath:
-            pickle.dump(self.actionHistory, filePath)
+        with open(file, "wb+") as filePath:
+            pickle.dump(self.moved, filePath)
 
     def load(self, file):
         with open(file, "rb") as filePath:
-            self.actionHistory = pickle.load(filePath)
+            self.moved = pickle.load(filePath)
         self.replay = True
 
     @classmethod

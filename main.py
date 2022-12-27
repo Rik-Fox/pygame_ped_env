@@ -24,7 +24,7 @@ class Main:
     # for rewards recieved by other models actions
     # model_path = "shaped_reward_agent"
     # model_path = "simple_reward_agent"
-    simple_agent = True
+    simple_agent = False
     # these varibles select which model
     # and it's appropriate scenarios to train
     if not simple_agent:
@@ -153,7 +153,7 @@ class Main:
         callback=callbacks,
     )
 
-    # env.modelL.save(os.path.join(log_path, "final_model"), include="env")
+    env.modelL.save(os.path.join(log_path, "final_model"), include="env")
 
 
 if __name__ == "__main__":

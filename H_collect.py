@@ -26,15 +26,21 @@ class H_collect:
         # model_path,
     )
 
+    scenarios = [6, 7, 14, 15, 16, 17]
+
+    attr_save_path = os.path.join(log_path, "shaped_reward_agent", "init_model")
+
+    basic_save_path = os.path.join(log_path, "simple_reward_agent", "init_model")
+
     env = RLCrossingSim(
-        window=(1280, 720),
+        sim_area=(1280, 720),
         scenarioList=scenarios,
         human_controlled_ped=False,
-        human_controlled_car=False,
+        human_controlled_car=True,
         headless=False,
         seed=4321,
-        # simple_model=basic_save_path,
-        # attr_model=attr_save_path,
+        basic_model=basic_save_path,
+        attr_model=attr_save_path,
         log_path=log_path,
         speed_coefficient=1.0,
         position_coefficient=1.0,
@@ -47,7 +53,7 @@ class H_collect:
         obs = env.reset()
         done = False
         while not done:
-            obs, reward, done, info = env.step(env.modelL.predict(obs))
+            obs, reward, done, info = env.step({"H_collect": obs})
 
 
 if __name__ == "__main__":
