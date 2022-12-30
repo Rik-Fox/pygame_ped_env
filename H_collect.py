@@ -38,7 +38,7 @@ class H_collect:
         human_controlled_ped=False,
         human_controlled_car=True,
         headless=False,
-        seed=4321,
+        seed=42,
         basic_model=basic_save_path,
         attr_model=attr_save_path,
         log_path=log_path,
@@ -54,6 +54,7 @@ class H_collect:
         done = False
         while not done:
             obs, reward, done, info = env.step({"H_collect": obs})
+        print(info)
 
 
 if __name__ == "__main__":

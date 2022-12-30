@@ -52,17 +52,15 @@ class RLCrossingSim(gym.Env):
         self.pos_coeff = position_coefficient
         self.steer_coeff = steering_coefficient
 
-        # this varible structure allows for sim_area =/= screen_size so events on edges
-        # and spawn are not displayed as all display updates use screen_size
-        self.screen_size = sim_area
-        self.sim_area_x = sim_area[0]
-        self.sim_area_y = sim_area[1]
+        # this varible structure allows for sim_area =/= screen_rect so events on edges
+        # and spawn are not displayed as all display updates use screen_rect
+        self.screen_rect = pygame.Rect((0, 0), sim_area)
+        assert self.screen_rect.w > self.screen_rect.h, "simulation must be portrait"
 
-        assert self.sim_area_x > self.sim_area_y, "simulation must be portrait"
-
-        # 150 is offscreen pixel buffer, TODO: should be associated to agent sprite rect
+        # 150 is offscreen pixel buffer,
+        # TODO: should be associated to agent sprite rect programatically
         self.observation_space = gym.spaces.Box(
-            low=-150, high=self.sim_area_x + 150, shape=(12,)
+            low=-150, high=self.screen_rect.w + 150, shape=(12,)
         )
 
         # (8 directions * 3 speeds) + 1 no_op action
@@ -83,13 +81,14 @@ class RLCrossingSim(gym.Env):
             self.scenarioList = [0]
 
         self.scenario = lambda: np.random.choice(self.scenarioList)
+        self.info = {"num_steps": 0, "done_cause": ""}
 
         self.roads = Group()
         self.generateRoads()
 
         if not self.headless:
             pygame.init()
-            self.screen = pygame.display.set_mode(self.screen_size)
+            self.screen = pygame.display.set_mode(self.screen_rect.size)
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
 
@@ -143,22 +142,29 @@ class RLCrossingSim(gym.Env):
 
         self.H_collect = human_controlled_car
 
+        if self.H_collect:
+            self.H_collect_path = os.path.join(log_path, "human_car_trajectories")
+            os.makedirs(self.H_collect_path, exist_ok=True)
+
         self.num_steps = 0
 
     def get_max_reward(self, simple_reward=False):
         # highest possible reward for both cases
         if simple_reward:
-            return (0.03 * (self.sim_area_x / 3)) * 2
+            return (0.03 * (self.screen_rect.w / 3)) * 2
         else:
-            return np.sum(np.array(range(0, self.sim_area_x, 3)) / self.sim_area_x) * 2
+            return (
+                np.sum(np.array(range(0, self.screen_rect.w, 3)) / self.screen_rect.w)
+                * 2
+            )
 
     def generateBackground(self):
         # Setting background image and scaling to window size
-        bkgrd = pygame.Surface(self.screen_size)
+        bkgrd = pygame.Surface(self.screen_rect.size)
         width_divisor, height_divisor = 2, 2
         tile_width, tile_height = (
-            self.screen_size[0] / width_divisor,
-            self.screen_size[1] / height_divisor,
+            self.screen_rect.w / width_divisor,
+            self.screen_rect.h / height_divisor,
         )
         bkgrd_img = pygame.image.load(
             os.path.join(
@@ -166,20 +172,20 @@ class RLCrossingSim(gym.Env):
                 "images/grass/ground_grass_gen_02.png",
             )
         ).convert()
-        # bkgrd = pygame.transform.scale(bkgrd_img, (self.screen_size))
+        # bkgrd = pygame.transform.scale(bkgrd_img, (self.screen_rect.size))
         bkgrd_tile = pygame.transform.scale(bkgrd_img, (tile_width, tile_height))
         for i in range(width_divisor):
             for j in range(height_divisor):
                 bkgrd.blit(bkgrd_tile, (tile_width * i, tile_height * j))
 
         # bkgrd = pygame.transform.scale(
-        #     pygame.image.load("../images/intersection.png"), screen_size
+        #     pygame.image.load("../images/intersection.png"), screen_rect.size
         # )
 
         return bkgrd
 
     def generateRoads(self):
-        scale = (self.sim_area_x / 5, self.sim_area_y / 5)
+        scale = (self.screen_rect.w / 5, self.screen_rect.h / 5)
         # fairly ineffecient TODO: refactor to road class for generality
 
         vertical_path = Sprite(self.roads)
@@ -195,13 +201,13 @@ class RLCrossingSim(gym.Env):
         image_tile = pygame.Surface((scale[0] / 2, scale[1] / 2))
         image_tile.blit(image, (0, 0), image_tile.get_rect())
         image_rect = image_tile.get_rect()
-        surf = pygame.Surface((image_rect.w, self.sim_area_y))
-        for t in range(np.floor(self.sim_area_y / image_rect.h).astype(int) + 1):
+        surf = pygame.Surface((image_rect.w, self.screen_rect.h))
+        for t in range(np.floor(self.screen_rect.h / image_rect.h).astype(int) + 1):
             surf.blit(image_tile, (0, t * image_rect.h))
 
         vertical_path.image = surf
         vertical_path.rect = vertical_path.image.get_rect()
-        vertical_path.rect.midtop = (self.sim_area_x / 2, 0)
+        vertical_path.rect.midtop = (self.screen_rect.w / 2, 0)
 
         horizontal_road = Sprite(self.roads)
         image_tile = pygame.transform.scale(
@@ -214,21 +220,23 @@ class RLCrossingSim(gym.Env):
             scale,
         )
         image_rect = image_tile.get_rect()
-        surf = pygame.Surface((self.sim_area_x, image_rect.h))
-        for t in range(np.floor(self.sim_area_x / image_rect.h).astype(int) + 1):
+        surf = pygame.Surface((self.screen_rect.w, image_rect.h))
+        for t in range(np.floor(self.screen_rect.w / image_rect.h).astype(int) + 1):
             surf.blit(image_tile, (t * image_rect.w, 0))
 
         horizontal_road.image = surf
         horizontal_road.rect = horizontal_road.image.get_rect()
-        horizontal_road.rect.midleft = (0, self.sim_area_y / 2)
+        horizontal_road.rect.midleft = (0, self.screen_rect.h / 2)
 
     def get_reward(self, agent: RLVehicle):
 
         if isinstance(agent.sprite, KeyboardVehicle):
             done = False
             if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
+                self.info["done_cause"] = "hit_pedestrian"
                 done = True
             if pygame.sprite.spritecollide(agent.sprite, self.traffic, True):
+                self.info["done_cause"] = "hit_traffic"
                 done = True
             rwd = 0.0
         elif self.simple_reward:
@@ -266,6 +274,7 @@ class RLCrossingSim(gym.Env):
         if (curr_d_obj == np.zeros(2)).all():
             # rwd for hitting goal
             rwd = self.get_max_reward(self.simple_reward)
+            self.info["done_cause"] = "objective_reached"
             done = True
         else:
             rwd = -0.04 + on_road
@@ -279,6 +288,7 @@ class RLCrossingSim(gym.Env):
         # if run over pedestrian, give reward reduction and end episode
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
             collide_rwd = -np.infty
+            self.info["done_cause"] = "hit_pedestrian"
             done = True
 
         if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
@@ -292,6 +302,7 @@ class RLCrossingSim(gym.Env):
         if (curr_d_obj == np.zeros(2)).all():
             # rwd for hitting goal
             position_rwd = self.get_max_reward(self.simple_reward)
+            self.info["done_cause"] = "objective_reached"
             done = True
         else:
             # straight line vector from start to goal
@@ -351,7 +362,6 @@ class RLCrossingSim(gym.Env):
         return position_rwd, speed_rwd, heading_rwd, collide_rwd, done
 
     def step(self, action):
-
         if isinstance(action, dict):
             if isinstance(self.vehicle.sprite, KeyboardVehicle):
                 self.vehicle.sprite.update()
@@ -360,7 +370,7 @@ class RLCrossingSim(gym.Env):
         else:
             self.vehicle.sprite.act(action)
             # self.vehicle.sprite.act([[6], None]) # just move right for testing without trained model
-
+        # print(self.vehicle.sprite.rect)
         self.traffic.sprite.update(self.traffic_action)
         if pygame.sprite.spritecollide(
             self.traffic.sprite, self.vehicle, False
@@ -394,24 +404,17 @@ class RLCrossingSim(gym.Env):
         rwd, self.done = self.get_reward(self.vehicle)
 
         self.num_steps += 1
+        self.info["num_steps"] = self.num_steps
 
-        if self.num_steps > self.sim_area_x * 2:
+        if self.num_steps > self.screen_rect.w * 2:
+            self.info["done_cause"] = "timed_out"
             self.done = True
 
         # remove vehicles once they drive offscreen and finish episode
         if not self.done:
             veh_rect = self.vehicle.sprite.rect
-            if not (0 - veh_rect.h <= veh_rect.centery <= self.sim_area_y + veh_rect.h):
-                if isinstance(self.vehicle.sprite, KeyboardVehicle):
-                    rwd = 0.0
-                # if not roughly at destination then punish
-                elif not (
-                    self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
-                ).all():
-                    rwd -= 3000
-                self.done = True
-            elif not (
-                0 - veh_rect.w <= veh_rect.centerx <= self.sim_area_x + veh_rect.w
+            if not (
+                0 - veh_rect.h <= veh_rect.centery <= self.screen_rect.h + veh_rect.h
             ):
                 if isinstance(self.vehicle.sprite, KeyboardVehicle):
                     rwd = 0.0
@@ -420,39 +423,48 @@ class RLCrossingSim(gym.Env):
                     self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
                 ).all():
                     rwd -= 3000
+                self.info["done_cause"] = "vehicle_offscreen"
+                self.done = True
+            elif not (
+                0 - veh_rect.w <= veh_rect.centerx <= self.screen_rect.w + veh_rect.w
+            ):
+                if isinstance(self.vehicle.sprite, KeyboardVehicle):
+                    rwd = 0.0
+                # if not roughly at destination then punish
+                elif not (
+                    self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
+                ).all():
+                    rwd -= 3000
+                self.info["done_cause"] = "vehicle_offscreen"
                 self.done = True
 
             # if vehicle not done, check for ped offscreen
             if not self.done:
-                ped_rect = self.pedestrian.sprite.rect
-                if not (
-                    0 - ped_rect.h <= ped_rect.centery <= self.sim_area_y + ped_rect.h
-                ):
-                    self.pedestrian.remove(self.pedestrian.sprite)
-                elif not (
-                    0 - ped_rect.w <= ped_rect.centerx <= self.sim_area_y + ped_rect.w
-                ):
+                if not self.screen_rect.contains(self.pedestrian.sprite):
                     self.pedestrian.remove(self.pedestrian.sprite)
 
         if self.H_collect and self.done:
+            os.makedirs(
+                os.path.join(self.H_collect_path, f"{self.scenarioName}"), exist_ok=True
+            )
             if isinstance(self.vehicle.sprite, KeyboardVehicle):
                 self.vehicle.sprite.save(
                     os.path.join(
-                        self.log_path,
-                        "human_car_trajectories",
-                        f"{self.scenarioName}_{np.random.randint(5)}",
+                        self.H_collect_path,
+                        f"{self.scenarioName}",
+                        f"traj_{np.random.randint(5)}",
                     )
                 )
             if isinstance(self.traffic.sprite, KeyboardVehicle):
                 self.traffic.sprite.save(
                     os.path.join(
-                        self.log_path,
-                        "human_car_trajectories",
-                        f"{self.scenarioName}_{np.random.randint(5)}",
+                        self.H_collect_path,
+                        f"{self.scenarioName}",
+                        f"traj_{np.random.randint(5)}",
                     )
                 )
 
-        return obs, rwd, self.done, {}
+        return obs, rwd, self.done, self.info
 
     def render(self):
         self.screen.blit(self.background, (0, 0))  # display background in simulation
@@ -483,32 +495,33 @@ class RLCrossingSim(gym.Env):
 
         scenario = self.scenario_map()[self.scenario()]
         self.scenarioName = scenario["name"]
+        self.info["scenario"] = self.scenarioName
 
         self.vehicle.empty()
         agent = scenario["agentSprites"][0]
         if agent[0] == "R":
-            agentL = RLVehicle.init_from_scenario(agent, self.screen_size)
+            agentL = RLVehicle.init_from_scenario(agent, self.screen_rect.size)
             agentL.model = self.modelA
             self.simple_reward = False
         elif agent[0] == "S":
-            agentL = RLVehicle.init_from_scenario(agent[1:], self.screen_size)
+            agentL = RLVehicle.init_from_scenario(agent[1:], self.screen_rect.size)
             agentL.model = self.modelB
             self.simple_reward = True
         else:
             if self.H_collect:
                 agentL = KeyboardVehicle.init_from_scenario(
                     agent,
-                    self.screen_size,
+                    self.screen_rect.size,
                     load_path=None,
                 )
             else:
                 agentL = KeyboardVehicle.init_from_scenario(
                     agent,
-                    self.screen_size,
+                    self.screen_rect.size,
                     load_path=os.path.join(
-                        self.log_path,
-                        "human_car_trajectories",
-                        f"{self.scenarioName}_{np.random.randint(5)}",
+                        self.H_collect_path,
+                        f"{self.scenarioName}",
+                        f"traj_{np.random.randint(5)}",
                     ),
                 )
 
@@ -522,37 +535,39 @@ class RLCrossingSim(gym.Env):
             traffic_agent = scenario["agentSprites"][1]
 
             if traffic_agent[0] == "R":
-                agentT = RLVehicle.init_from_scenario(traffic_agent, self.screen_size)
+                agentT = RLVehicle.init_from_scenario(
+                    traffic_agent, self.screen_rect.size
+                )
                 agentT.model = self.modelA
             elif traffic_agent[0] == "S":
                 agentT = RLVehicle.init_from_scenario(
-                    traffic_agent[1:], self.screen_size
+                    traffic_agent[1:], self.screen_rect.size
                 )
                 agentT.model = self.modelB
             else:
                 if self.H_collect:
                     agentT = KeyboardVehicle.init_from_scenario(
                         traffic_agent,
-                        self.screen_size,
+                        self.screen_rect.size,
                         load_path=None,
                     )
                     if isinstance(agentL, KeyboardVehicle):
                         agentT.load(
                             os.path.join(
-                                self.log_path,
-                                "human_car_trajectories",
-                                f"{self.scenarioName}_{np.random.randint(5)}",
+                                self.H_collect_path,
+                                f"{self.scenarioName}",
+                                f"traj_{np.random.randint(5)}",
                             )
                         ),
 
                 else:
                     agentT = KeyboardVehicle.init_from_scenario(
                         traffic_agent,
-                        self.screen_size,
+                        self.screen_rect.size,
                         load_path=os.path.join(
-                            self.log_path,
-                            "human_car_trajectories",
-                            f"{self.scenarioName}_{np.random.randint(5)}",
+                            self.H_collect_path,
+                            f"{self.scenarioName}",
+                            f"traj_{np.random.randint(5)}",
                         ),
                     )
                     # agentT.replay = True
@@ -572,23 +587,29 @@ class RLCrossingSim(gym.Env):
             self.pedestrian.add(
                 RandomPedestrian(
                     # add slight noise in pedestrian start position
-                    (self.screen_size[0] / 2) + (np.random.rand() * 4) - 2,
-                    (self.screen_size[1] * (7 / 8)) + (np.random.rand() * 4) - 2,
+                    (self.screen_rect.w / 2) + (np.random.rand() * 4) - 2,
+                    (self.screen_rect.h * (7 / 8)) + (np.random.rand() * 4) - 2,
                     "up",
                 )
             )
         else:
             self.pedestrian.add(
                 KeyboardPedestrian(
-                    self.screen_size[0] / 2, self.screen_size[1] * (7 / 8), "up"
+                    self.screen_rect.w / 2, self.screen_rect.h * (7 / 8), "up"
                 )
             )
 
         if not self.headless:
             pygame.init()
-            self.screen = pygame.display.set_mode(self.screen_size)
+            self.screen = pygame.display.set_mode(self.screen_rect.size)
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
+
+            # grey out screen and wait 1 second
+            # on starting next scenario when rendering
+            self.screen.fill([127, 127, 127])
+            pygame.display.flip()
+            time.sleep(1)
 
         try:
             self.traffic_action = self.traffic.sprite.model.predict(obs)

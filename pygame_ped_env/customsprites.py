@@ -91,16 +91,32 @@ class Vehicle(Sprite):
             "bike": 2.5,
         }  # average speeds of vehicles
 
+        colours = [
+            "blue",
+            "black",
+            "silver",
+            "grey",
+            "white",
+            "red",
+            "yellow",
+            "green",
+            "purple",
+            "brown",
+        ]
+
         self.lane_offset = (2 - lane) * 15
         self.vehicleClass = vehicleClass
         self.speed = speeds[vehicleClass]
-        # self.direction_number = direction_number
+        self.colour = random.choice(colours)
         self.direction = direction
         path = os.path.join(
             os.path.dirname(pygame_ped_env.__file__),
-            "images/" + direction + "/" + vehicleClass + ".png",
+            "images",
+            direction,
+            f"{self.colour}_{vehicleClass}.png",
         )
         self.image = pygame.image.load(path)
+        self.image = pygame.transform.scale(self.image, (54, 22))
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y

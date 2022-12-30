@@ -37,6 +37,7 @@ class RLVehicle(Vehicle):
         # hook for RL algo
         self.model = None
 
+        self.replay = False
         self.moved = [np.array([0, 0])]
         self.init_pos = np.array(start)
         self.objective = np.array(end)
@@ -93,12 +94,27 @@ class RLVehicle(Vehicle):
             self.rect.center += np.array([-1, 0])  # just move left
 
     def save(self, file):
-        with open(file, "wb") as filePath:
-            pickle.dump(self.moved, filePath)
+        save_dict = {
+            "direction": self.direction,
+            "colour": self.colour,
+            "moved": self.moved,
+            "model": self.model,
+            "init_pos": self.init_pos,
+            "objective": self.objective,
+        }
+        with open(file, "wb+") as filePath:
+            pickle.dump(save_dict, filePath)
 
-    # def load(self, file):
-    #     with open(file, "rb") as filePath:
-    #         self.moved = pickle.load(filePath)
+    def load(self, file):
+        with open(file, "rb") as filePath:
+            load_dict = pickle.load(filePath)
+        self.direction = load_dict["direction"]
+        self.colour = load_dict["colour"]
+        self.moved = load_dict["moved"]
+        self.model = load_dict["model"]
+        self.init_pos = load_dict["init_pos"]
+        self.objective = load_dict["objective"]
+        self.replay = True
 
     @classmethod
     def init_from_scenario(cls, scenario: str, window_size):
@@ -239,12 +255,20 @@ class KeyboardVehicle(Vehicle):
                 # self.animate("left")
 
     def save(self, file):
+        save_dict = {
+            "direction": self.direction,
+            "colour": self.colour,
+            "moved": self.moved,
+        }
         with open(file, "wb+") as filePath:
-            pickle.dump(self.moved, filePath)
+            pickle.dump(save_dict, filePath)
 
     def load(self, file):
         with open(file, "rb") as filePath:
-            self.moved = pickle.load(filePath)
+            load_dict = pickle.load(filePath)
+        self.direction = load_dict["direction"]
+        self.colour = load_dict["colour"]
+        self.moved = load_dict["moved"]
         self.replay = True
 
     @classmethod

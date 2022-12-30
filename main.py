@@ -30,7 +30,7 @@ class Main:
     if not simple_agent:
         # (A) attribute based reward agent
         model_path = "shaped_reward_agent"
-        simple_reward = True
+        simple_reward = False
         scenarios = [*range(0, 8)]
     else:
         # (B) basic reward agent
@@ -43,6 +43,8 @@ class Main:
         "logs",
         model_path,
     )
+
+    os.makedirs(log_path, exist_ok=True)
 
     window = (1280, 720)
     n_envs = 10
@@ -129,7 +131,7 @@ class Main:
             clbks.EvalCallback(
                 eval_env=eval_env,
                 callback_after_eval=clbks.StopTrainingOnNoModelImprovement(
-                    max_no_improvement_evals=int(1e4), min_evals=int(1e5), verbose=1
+                    max_no_improvement_evals=int(1e5), min_evals=int(1e6), verbose=1
                 ),
                 callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
                     reward_threshold=(
