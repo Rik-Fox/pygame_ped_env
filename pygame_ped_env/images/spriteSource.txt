@@ -1,6 +1,5 @@
-(unused) vehicles - https://opengameart.org/content/free-top-down-car-sprites-by-unlucky-studio
 
-car sprite yellow - https://www.pngwing.com/en/free-png-vvfxj (other colours edited in paint 3D myself)
+car sprites - https://www.vecteezy.com/vector-art/298040-set-of-cars-and-trucks-in-many-colors
 
 grass -https://opengameart.org/content/synthetic-grass-texture-pack
 
@@ -9,3 +8,7 @@ road - https://opengameart.org/content/road-tile-textures
 pedestrians - https://opengameart.org/content/db16-rpg-character-sprites-v2
 
 
+(unused) 
+vehicles - https://opengameart.org/content/free-top-down-car-sprites-by-unlucky-studio
+car sprite yellow - https://www.pngwing.com/en/free-png-vvfxj (other colours edited in paint 3D myself)
+car sprite sheet - http://zenseeker.net/PaperMiniatures/CarWars.htm

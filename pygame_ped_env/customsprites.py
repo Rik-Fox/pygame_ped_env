@@ -93,15 +93,13 @@ class Vehicle(Sprite):
 
         colours = [
             "blue",
-            "black",
             "silver",
-            "grey",
             "white",
             "red",
             "yellow",
             "green",
-            "purple",
             "brown",
+            "orange",
         ]
 
         self.lane_offset = (2 - lane) * 15
@@ -116,13 +114,14 @@ class Vehicle(Sprite):
             f"{self.colour}_{vehicleClass}.png",
         )
         self.image = pygame.image.load(path)
-        self.image = pygame.transform.scale(self.image, (54, 22))
+        self.image.set_colorkey((255, 0, 255))
+        self.image = pygame.transform.scale(self.image, (60, 30))
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
 
         if self.direction == "right":
-            self.rect.bottom = y - self.lane_offset
+            self.rect.bottom = y - self.lane_offset - 5
         elif self.direction == "down":
             self.rect.left = x + self.lane_offset
         elif self.direction == "left":

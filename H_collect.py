@@ -38,7 +38,7 @@ class H_collect:
         human_controlled_ped=False,
         human_controlled_car=True,
         headless=False,
-        seed=42,
+        seed=432,
         basic_model=basic_save_path,
         attr_model=attr_save_path,
         log_path=log_path,
