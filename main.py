@@ -49,18 +49,13 @@ def Main(args=param_parser.parse_args()):
         args.scenarioList = [*range(0, 8)]
         args.eval_scenarioList = [*range(0, 8)]
 
-    
-
     log_path = os.path.join(
         args.log_path,
         args.model_name,
         args.exp_log_name,
     )
 
-    monitor_path = os.path.join(
-        args.log_path, args.model_name, args.exp_log_name, "monitor_files"
-    )
-        
+    monitor_path = os.path.join(log_path, "monitor_files")
 
     eval_log_path = os.path.join(
         args.log_path,
@@ -68,20 +63,12 @@ def Main(args=param_parser.parse_args()):
         args.eval_log_name,
     )
 
-    eval_monitor_path = os.path.join(
-            args.log_path, args.model_name, args.eval_log_name, "monitor_files"
-    )
+    eval_monitor_path = os.path.join(eval_log_path, "monitor_files")
 
     os.makedirs(log_path, exist_ok=True)
     os.makedirs(eval_log_path, exist_ok=True)
     os.makedirs(monitor_path, exist_ok=True)
     os.makedirs(eval_monitor_path, exist_ok=True)
-
-    
-
-    import pdb
-
-    pdb.set_trace()
 
     env = make_vec_env(
         RLCrossingSim,
@@ -131,7 +118,7 @@ def Main(args=param_parser.parse_args()):
             clbks.EveryNTimesteps(
                 args.log_interval * args.n_envs,
                 CustomTrackingCallback(
-                    monitor_dir=args.monitor_path,
+                    monitor_dir=monitor_path,
                 ),
             ),
             clbks.CheckpointCallback(
@@ -165,7 +152,7 @@ def Main(args=param_parser.parse_args()):
     )
 
     env.envs[0].modelL.learn(
-        total_timesteps=(450 * args.n_episodes)/args.n_envs,
+        total_timesteps=(450 * args.n_episodes) / args.n_envs,
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
     )

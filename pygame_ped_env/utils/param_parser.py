@@ -50,9 +50,7 @@ param_parser.add_argument("--checkpoint_filename_prefix", type=str, default="mod
 param_parser.add_argument("--log_path", type=str, default=None)
 param_parser.add_argument("--model_name", type=str, default="simple_reward_agent")
 param_parser.add_argument("--exp_log_name", type=str, default="train_logs")
-param_parser.add_argument(
-    "--monitor_path", type=str, default="logs/simple_reward_agent/train_logs/monitor"
-)
+# param_parser.add_argument("--monitor_dirname", type=str, default="monitor_files")
 
 # eval params
 param_parser.add_argument("--eval_interval", type=int, default=1000000)
@@ -65,7 +63,6 @@ param_parser.add_argument("--eval_verbose", type=int, default=1)
 # eval scenario params
 param_parser.add_argument("--eval_human_controlled_ped", type=bool, default=False)
 param_parser.add_argument("--eval_human_controlled_car", type=bool, default=False)
-param_parser.add_argument("--eval_seed", type=int, default=4321)
 param_parser.add_argument("--eval_scenarioList", type=list, default=[*range(8, 16)])
 param_parser.add_argument("--eval_sim_area", type=tuple, default=(1280, 720))
 param_parser.add_argument("--eval_speed_coefficient", type=float, default=1.0)
@@ -75,9 +72,10 @@ param_parser.add_argument("--eval_basic_model", type=str, default=None)
 param_parser.add_argument("--eval_attr_model", type=str, default=None)
 
 # eval seed and log params
+param_parser.add_argument("--eval_seed", type=int, default=4321)
 param_parser.add_argument("--eval_log_name", type=str, default="eval_logs")
-param_parser.add_argument(
-    "--eval_monitor_path",
-    type=str,
-    default="logs/simple_reward_agent/eval_logs/monitor",
-)
+# param_parser.add_argument(
+#     "--eval_monitor_dirname",
+#     type=str,
+#     default="monitor_files",
+# )
