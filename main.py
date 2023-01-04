@@ -43,7 +43,7 @@ def Main(args=param_parser.parse_args()):
     # must use correct scenario set otherwise will be updated for rewards
     # recieved by other models actions; these varibles switch to the shaped model
     # and all it's appropriate scenarios etc to train with only a boolean flag
-    if not args.simple_agent:
+    if args.shaped_agent:
         # attribute based reward agent
         args.model_name = "shaped_reward_agent"
         args.scenarioList = [*range(0, 8)]
@@ -137,7 +137,7 @@ def Main(args=param_parser.parse_args()):
                 ),
                 callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
                     reward_threshold=(
-                        eval_env.envs[0].get_max_reward(args.simple_agent) / 2
+                        eval_env.envs[0].get_max_reward(args.shaped_agent) / 2
                     )
                     * 0.98
                 ),

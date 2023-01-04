@@ -148,9 +148,9 @@ class RLCrossingSim(gym.Env):
 
         self.num_steps = 0
 
-    def get_max_reward(self, simple_reward=False):
+    def get_max_reward(self, shaped_reward=True):
         # highest possible reward for both cases
-        if simple_reward:
+        if not shaped_reward:
             return (0.03 * (self.screen_rect.w / 3)) * 2
         else:
             return (
