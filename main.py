@@ -1,15 +1,7 @@
-# from env import TrafficSim
-import time
 import os
-import numpy as np
 
-from stable_baselines3 import DQN
 from stable_baselines3.common.env_util import make_vec_env
 import stable_baselines3.common.callbacks as clbks
-
-from pygame_ped_env.envs import RLCrossingSim
-from custom_logging import CustomTrackingCallback
-from param_parser import *
 
 #     EvalCallback,
 #     StopTrainingOnMaxEpisodes,
@@ -18,6 +10,10 @@ from param_parser import *
 #     EveryNTimesteps,
 #     CheckpointCallback,
 #     CallbackList,
+
+from pygame_ped_env.envs import RLCrossingSim
+from pygame_ped_env.utils.param_parser import param_parser
+from pygame_ped_env.utils.custom_logging import CustomTrackingCallback
 
 
 def Main(args=param_parser.parse_args()):
@@ -74,9 +70,6 @@ def Main(args=param_parser.parse_args()):
     os.makedirs(log_path, exist_ok=True)
     os.makedirs(eval_log_path, exist_ok=True)
 
-    n_envs = 10
-    n_episodes = 1e6
-
     env = make_vec_env(
         RLCrossingSim,
         args.n_envs,
@@ -98,8 +91,6 @@ def Main(args=param_parser.parse_args()):
         monitor_dir=args.monitor_path,
     )
     env.reset()
-
-    # TODO: add seperate eval env params in param_parser
 
     eval_env = make_vec_env(
         RLCrossingSim,
@@ -136,7 +127,7 @@ def Main(args=param_parser.parse_args()):
                 name_prefix=args.checkpoint_filename_prefix,
                 verbose=args.verbose,
             ),
-            clbks.StopTrainingOnMaxEpisodes(n_episodes, verbose=args.verbose),
+            clbks.StopTrainingOnMaxEpisodes(args.n_episodes, verbose=args.verbose),
             clbks.EvalCallback(
                 eval_env=eval_env,
                 callback_after_eval=clbks.StopTrainingOnNoModelImprovement(
@@ -161,7 +152,7 @@ def Main(args=param_parser.parse_args()):
     )
 
     env.envs[0].modelL.learn(
-        total_timesteps=450 * n_episodes,
+        total_timesteps=450 * args.n_episodes,
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
     )
@@ -170,7 +161,4 @@ def Main(args=param_parser.parse_args()):
 
 
 if __name__ == "__main__":
-
-    args = param_parser.parse_args()
-
-    Main(args)
+    Main(args=param_parser.parse_args())

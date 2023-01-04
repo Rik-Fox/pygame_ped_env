@@ -4,11 +4,13 @@ from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
 
 
-def Eval(args=param_parser.parse_args()):
+def H_collect(args=param_parser.parse_args()):
 
     # if log path not specificed then set to default outside of code folder
     if args.log_path is None:
-        wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        wkdir = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
         args.log_path = os.path.join(wkdir, "logs")
 
     if args.basic_model is None:
@@ -39,18 +41,23 @@ def Eval(args=param_parser.parse_args()):
     log_path = os.path.join(
         args.log_path,
         args.model_name,
-        "env_eval_logs",
+        "H_collect_logs",
     )
     os.makedirs(log_path, exist_ok=True)
 
-    scenarios = [16, 17, 18]
+    # dont collect for H2 as just load both H_l and H_r
+    # [RL_H_r, RL_H_l, SRL_H_r, SLH_H_l, H_r, H_l]
+    # scenarios = [6, 7, 14, 15, 16, 17]
+
+    scenarios = [16, 17]
 
     env = RLCrossingSim(
         sim_area=args.sim_area,
         # scenarioList=args.scenarioList,
         scenarioList=scenarios,
         human_controlled_ped=args.human_controlled_ped,
-        human_controlled_car=args.human_controlled_car,
+        # human_controlled_car=args.human_controlled_car,
+        human_controlled_car=True,
         # headless=args.headless,
         headless=False,
         seed=args.seed,
@@ -61,19 +68,18 @@ def Eval(args=param_parser.parse_args()):
         position_coefficient=args.position_coefficient,
         steering_coefficient=args.steering_coefficient,
     )
-    n_episodes = 10
+
+    n_episodes = 20
 
     # for ep in range(args.n_episodes):
     for ep in range(n_episodes):
         obs = env.reset()
         done = False
         while not done:
-            if env.scenarioName in ("H2", "H_l", "H_r"):
-                obs, reward, done, info = env.step({"obs": obs})
-            else:
-                obs, reward, done, info = env.step(env.modelL.predict(obs))
+            obs, reward, done, info = env.step({"obs": obs})
         print(info)
 
 
 if __name__ == "__main__":
-    Eval(args=param_parser.parse_args())
+
+    H_collect(args=param_parser.parse_args())

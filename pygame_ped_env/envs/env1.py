@@ -10,7 +10,7 @@ from pygame.sprite import Sprite, Group, GroupSingle
 from typing import Union, Sequence
 
 import pygame_ped_env
-from pygame_ped_env.agents import (
+from pygame_ped_env.entities.agents import (
     RLVehicle,
     KeyboardVehicle,
     KeyboardPedestrian,
@@ -39,6 +39,7 @@ class RLCrossingSim(gym.Env):
         np.random.seed(seed)
 
         self.log_path = log_path
+        self.parent_log_path = os.path.dirname(os.path.dirname(self.log_path))
 
         # whether to render or not
         self.headless = headless
@@ -99,7 +100,7 @@ class RLCrossingSim(gym.Env):
         except:
             # load default
             modelB_path = os.path.join(
-                os.path.dirname(self.log_path), "simple_reward_agent", "init_model"
+                self.parent_log_path, "simple_reward_agent", "init_model"
             )
             try:
                 self.modelB = DQN.load(modelB_path, env=self)
@@ -110,7 +111,7 @@ class RLCrossingSim(gym.Env):
                     self,
                     verbose=0,
                     tensorboard_log=os.path.join(
-                        os.path.dirname(self.log_path), "simple_reward_agent"
+                        self.parent_log_path, "simple_reward_agent"
                     ),
                 )
                 basic_model._setup_model()
@@ -122,7 +123,7 @@ class RLCrossingSim(gym.Env):
             self.modelA = DQN.load(attr_model, env=self)
         except:
             modelA_path = os.path.join(
-                os.path.dirname(self.log_path), "shaped_reward_agent", "init_model"
+                self.parent_log_path, "shaped_reward_agent", "init_model"
             )
             try:
                 self.modelA = DQN.load(modelA_path, env=self)
@@ -132,7 +133,7 @@ class RLCrossingSim(gym.Env):
                     self,
                     verbose=0,
                     tensorboard_log=os.path.join(
-                        os.path.dirname(self.log_path), "shaped_reward_agent"
+                        self.parent_log_path, "shaped_reward_agent"
                     ),
                 )
                 attr_model.save(modelA_path, include="env")
@@ -140,11 +141,10 @@ class RLCrossingSim(gym.Env):
 
         self.training = not human_controlled_ped
 
+        self.H_traj_path = os.path.join(self.parent_log_path, "human_car_trajectories")
         self.H_collect = human_controlled_car
-
         if self.H_collect:
-            self.H_collect_path = os.path.join(log_path, "human_car_trajectories")
-            os.makedirs(self.H_collect_path, exist_ok=True)
+            os.makedirs(self.H_traj_path, exist_ok=True)
 
         self.num_steps = 0
 
@@ -366,7 +366,7 @@ class RLCrossingSim(gym.Env):
             if isinstance(self.vehicle.sprite, KeyboardVehicle):
                 self.vehicle.sprite.update()
             else:
-                self.vehicle.sprite.act(self.modelL.predict(action["H_collect"]))
+                self.vehicle.sprite.act(self.modelL.predict(action["obs"]))
         else:
             self.vehicle.sprite.act(action)
             # self.vehicle.sprite.act([[6], None]) # just move right for testing without trained model
@@ -383,6 +383,7 @@ class RLCrossingSim(gym.Env):
         try:
             self.pedestrian.sprite.update()
         except:
+            self.pedestrian.empty()
             self.pedestrian.add(Sprite())
             self.pedestrian.sprite.rect = pygame.Rect(0, 0, 0, 0)
 
@@ -443,26 +444,23 @@ class RLCrossingSim(gym.Env):
                 if not self.screen_rect.contains(self.pedestrian.sprite):
                     self.pedestrian.remove(self.pedestrian.sprite)
 
-        if self.H_collect and self.done:
+        if self.H_collect and self.done and self.scenarioName != "H2":
+            # save trajectory
             os.makedirs(
-                os.path.join(self.H_collect_path, f"{self.scenarioName}"), exist_ok=True
+                os.path.join(self.H_traj_path, self.scenarioName), exist_ok=True
             )
+            save_path = os.path.join(
+                self.H_traj_path,
+                f"{self.scenarioName}",
+                f"traj_{np.random.randint(5)}",
+            )
+
             if isinstance(self.vehicle.sprite, KeyboardVehicle):
-                self.vehicle.sprite.save(
-                    os.path.join(
-                        self.H_collect_path,
-                        f"{self.scenarioName}",
-                        f"traj_{np.random.randint(5)}",
-                    )
-                )
+                self.vehicle.sprite.save(save_path)
             if isinstance(self.traffic.sprite, KeyboardVehicle):
-                self.traffic.sprite.save(
-                    os.path.join(
-                        self.H_collect_path,
-                        f"{self.scenarioName}",
-                        f"traj_{np.random.randint(5)}",
-                    )
-                )
+                self.traffic.sprite.save(save_path)
+
+            print(save_path)
 
         return obs, rwd, self.done, self.info
 
@@ -508,7 +506,17 @@ class RLCrossingSim(gym.Env):
             agentL.model = self.modelB
             self.simple_reward = True
         else:
-            if self.H_collect:
+            if self.scenarioName == "H2":
+                agentL = KeyboardVehicle.init_from_scenario(
+                    agent,
+                    self.screen_rect.size,
+                    load_path=os.path.join(
+                        self.H_traj_path,
+                        "H_r",
+                        f"traj_{np.random.randint(5)}",
+                    ),
+                )
+            elif self.H_collect:
                 agentL = KeyboardVehicle.init_from_scenario(
                     agent,
                     self.screen_rect.size,
@@ -519,8 +527,8 @@ class RLCrossingSim(gym.Env):
                     agent,
                     self.screen_rect.size,
                     load_path=os.path.join(
-                        self.H_collect_path,
-                        f"{self.scenarioName}",
+                        self.H_traj_path,
+                        self.scenarioName,
                         f"traj_{np.random.randint(5)}",
                     ),
                 )
@@ -545,27 +553,37 @@ class RLCrossingSim(gym.Env):
                 )
                 agentT.model = self.modelB
             else:
-                if self.H_collect:
+                if self.scenarioName == "H2":
+                    agentT = KeyboardVehicle.init_from_scenario(
+                        traffic_agent,
+                        self.screen_rect.size,
+                        load_path=os.path.join(
+                            self.H_traj_path,
+                            "H_l",
+                            f"traj_{np.random.randint(5)}",
+                        ),
+                    )
+                elif self.H_collect:
                     agentT = KeyboardVehicle.init_from_scenario(
                         traffic_agent,
                         self.screen_rect.size,
                         load_path=None,
                     )
-                    if isinstance(agentL, KeyboardVehicle):
-                        agentT.load(
-                            os.path.join(
-                                self.H_collect_path,
-                                f"{self.scenarioName}",
-                                f"traj_{np.random.randint(5)}",
-                            )
-                        ),
+                    # if isinstance(agentL, KeyboardVehicle):
+                    #     agentT.load(
+                    #         os.path.join(
+                    #             self.H_traj_path,
+                    #             f"{self.scenarioName}",
+                    #             f"traj_{np.random.randint(5)}",
+                    #         )
+                    #     ),
 
                 else:
                     agentT = KeyboardVehicle.init_from_scenario(
                         traffic_agent,
                         self.screen_rect.size,
                         load_path=os.path.join(
-                            self.H_collect_path,
+                            self.H_traj_path,
                             f"{self.scenarioName}",
                             f"traj_{np.random.randint(5)}",
                         ),

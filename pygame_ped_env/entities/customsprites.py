@@ -3,7 +3,7 @@ import os
 import pygame
 from pygame.sprite import Sprite, AbstractGroup
 import pygame_ped_env
-from pygame_ped_env.spritesheet import SpriteSheet, SpriteStripAnim
+from pygame_ped_env.entities.spritesheet import SpriteSheet, SpriteStripAnim
 
 
 class Pedestrian(Sprite):

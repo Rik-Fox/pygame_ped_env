@@ -1,8 +1,8 @@
 import pygame
 from pygame.sprite import Sprite, AbstractGroup
-from pygame_ped_env.spritesheet import SpriteSheet
+from pygame_ped_env.entities.spritesheet import SpriteSheet
 
-from pygame_ped_env.customsprites import Vehicle, Pedestrian
+from pygame_ped_env.entities.customsprites import Vehicle, Pedestrian
 
 import numpy as np
 import pickle
@@ -214,7 +214,7 @@ class KeyboardVehicle(Vehicle):
         elif self.replay:
             try:
                 action = self.actionHistory.pop(0)
-                self.rect.center += mapped_action
+                self.rect.center += action
             except:
                 if self.direction == "down":
                     self.rect.y += self.speed

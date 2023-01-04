@@ -1,5 +1,4 @@
 import argparse
-import os
 
 # argument parser
 param_parser = argparse.ArgumentParser(description="RLCrossingSim")

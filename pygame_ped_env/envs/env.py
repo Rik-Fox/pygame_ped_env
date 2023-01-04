@@ -10,7 +10,7 @@ from pygame.sprite import Sprite, Group
 from typing import Union, Sequence
 import pygame_ped_env
 
-from pygame_ped_env.agents import (
+from pygame_ped_env.entities.agents import (
     RLVehicle,
     KeyboardPedestrian,
     RandomPedestrian,
@@ -182,7 +182,7 @@ class TrafficSim(gym.Env):
 
     # Generating vehicles in the simulation
     def generateTraffic(self):
-        from pygame_ped_env.customsprites import Vehicle, Pedestrian
+        from pygame_ped_env.entities.customsprites import Vehicle, Pedestrian
 
         # Coordinates of start positions
         x = {
