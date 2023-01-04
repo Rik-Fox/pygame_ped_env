@@ -27,7 +27,7 @@ param_parser.add_argument("--position_coefficient", type=float, default=1.0)
 param_parser.add_argument("--steering_coefficient", type=float, default=1.0)
 
 # training params
-param_parser.add_argument("--n_episodes", type=int, default=10)
+param_parser.add_argument("--n_episodes", type=int, default=1000000)
 param_parser.add_argument("--n_envs", type=int, default=10)
 param_parser.add_argument("--headless", type=bool, default=True)
 param_parser.add_argument("--render", type=bool, default=False)
@@ -55,7 +55,7 @@ param_parser.add_argument(
 )
 
 # eval params
-param_parser.add_argument("--eval_interval", type=int, default=1000)
+param_parser.add_argument("--eval_interval", type=int, default=1000000)
 param_parser.add_argument("--eval_episodes", type=int, default=10)
 param_parser.add_argument("--eval_n_envs", type=int, default=1)
 param_parser.add_argument("--eval_headless", type=bool, default=True)

@@ -48,12 +48,8 @@ def Main(args=param_parser.parse_args()):
         args.model_name = "shaped_reward_agent"
         args.scenarioList = [*range(0, 8)]
         args.eval_scenarioList = [*range(0, 8)]
-        args.monitor_path = os.path.join(
-            args.log_path, args.model_name, args.exp_log_name, "monitor"
-        )
-        args.eval_monitor_path = os.path.join(
-            args.log_path, args.model_name, args.eval_log_name, "eval_monitor"
-        )
+
+    
 
     log_path = os.path.join(
         args.log_path,
@@ -61,14 +57,31 @@ def Main(args=param_parser.parse_args()):
         args.exp_log_name,
     )
 
+    monitor_path = os.path.join(
+        args.log_path, args.model_name, args.exp_log_name, "monitor_files"
+    )
+        
+
     eval_log_path = os.path.join(
         args.log_path,
         args.model_name,
         args.eval_log_name,
     )
 
+    eval_monitor_path = os.path.join(
+            args.log_path, args.model_name, args.eval_log_name, "monitor_files"
+    )
+
     os.makedirs(log_path, exist_ok=True)
     os.makedirs(eval_log_path, exist_ok=True)
+    os.makedirs(monitor_path, exist_ok=True)
+    os.makedirs(eval_monitor_path, exist_ok=True)
+
+    
+
+    import pdb
+
+    pdb.set_trace()
 
     env = make_vec_env(
         RLCrossingSim,
@@ -88,7 +101,7 @@ def Main(args=param_parser.parse_args()):
             "steering_coefficient": args.steering_coefficient,
         },
         seed=args.seed,
-        monitor_dir=args.monitor_path,
+        monitor_dir=monitor_path,
     )
     env.reset()
 
@@ -110,7 +123,7 @@ def Main(args=param_parser.parse_args()):
             "steering_coefficient": args.eval_steering_coefficient,
         },
         seed=args.eval_seed,
-        monitor_dir=args.eval_monitor_path,
+        monitor_dir=eval_monitor_path,
     )
 
     callbacks = clbks.CallbackList(
@@ -152,7 +165,7 @@ def Main(args=param_parser.parse_args()):
     )
 
     env.envs[0].modelL.learn(
-        total_timesteps=450 * args.n_episodes,
+        total_timesteps=(450 * args.n_episodes)/args.n_envs,
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
     )
