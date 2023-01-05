@@ -44,7 +44,7 @@ param_parser.add_argument("--human_controlled_car", default=False, action="store
 # seed and log params
 param_parser.add_argument("--seed", type=int, default=4321)
 param_parser.add_argument("--log_interval", type=int, default=1000)
-param_parser.add_argument("--checkpoint_interval", type=int, default=1000)
+param_parser.add_argument("--checkpoint_interval", type=int, default=10000)
 param_parser.add_argument("--checkpoint_dirname", type=str, default="checkpoints")
 param_parser.add_argument("--checkpoint_filename_prefix", type=str, default="model_at")
 param_parser.add_argument("--log_path", type=str, default=None)
@@ -53,7 +53,7 @@ param_parser.add_argument("--exp_log_name", type=str, default="train_logs")
 # param_parser.add_argument("--monitor_dirname", type=str, default="monitor_files")
 
 # eval params
-param_parser.add_argument("--eval_interval", type=int, default=1000000)
+param_parser.add_argument("--eval_interval", type=int, default=100000)
 param_parser.add_argument("--eval_episodes", type=int, default=10)
 param_parser.add_argument("--eval_n_envs", type=int, default=1)
 param_parser.add_argument("--eval_headless", default=True, action="store_false")

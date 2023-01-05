@@ -407,7 +407,7 @@ class RLCrossingSim(gym.Env):
         self.num_steps += 1
         self.info["num_steps"] = self.num_steps
 
-        if self.num_steps > self.screen_rect.w * 2:
+        if self.num_steps > self.screen_rect.w:
             self.info["done_cause"] = "timed_out"
             self.done = True
 

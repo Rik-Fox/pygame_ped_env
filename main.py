@@ -116,7 +116,7 @@ def Main(args=param_parser.parse_args()):
     callbacks = clbks.CallbackList(
         [
             clbks.EveryNTimesteps(
-                args.log_interval * args.n_envs,
+                args.log_interval,
                 CustomTrackingCallback(
                     monitor_dir=monitor_path,
                 ),
@@ -152,12 +152,12 @@ def Main(args=param_parser.parse_args()):
     )
 
     env.envs[0].modelL.learn(
-        total_timesteps=(450 * args.n_episodes) / args.n_envs,
+        total_timesteps=(450 * args.n_episodes),
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
     )
 
-    env.modelL.save(os.path.join(log_path, "final_model"), include="env")
+    env.envs[0].modelL.save(os.path.join(log_path, "final_model"), include="env")
 
 
 if __name__ == "__main__":
