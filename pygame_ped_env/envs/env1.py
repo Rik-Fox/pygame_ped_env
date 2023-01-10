@@ -61,7 +61,7 @@ class RLCrossingSim(gym.Env):
         # 150 is offscreen pixel buffer,
         # TODO: should be associated to agent sprite rect programatically
         self.observation_space = gym.spaces.Box(
-            low=-150, high=self.screen_rect.w + 150, shape=(12,)
+            low=-150, high=self.screen_rect.w + 150, shape=(14,)
         )
 
         # (8 directions * 3 speeds) + 1 no_op action
@@ -263,7 +263,7 @@ class RLCrossingSim(gym.Env):
 
         # if run over pedestrian, give reward reduction and end episode
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
-            return -np.infty, True
+            return -10000, True
 
         on_road = 0.01
         if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
@@ -287,7 +287,7 @@ class RLCrossingSim(gym.Env):
 
         # if run over pedestrian, give reward reduction and end episode
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
-            collide_rwd = -np.infty
+            collide_rwd = -10000
             self.info["done_cause"] = "hit_pedestrian"
             done = True
 
@@ -395,6 +395,7 @@ class RLCrossingSim(gym.Env):
                 [self.vehicle.sprite.rect],
                 [self.traffic.sprite.rect],  # padding for single vehicle scenario
                 [self.pedestrian.sprite.rect],
+                [self.vehicle.sprite.objective],
             ],
         )
         try:
@@ -488,10 +489,14 @@ class RLCrossingSim(gym.Env):
         # hacky way to have ~60 FPS TODO: implentment properly
         time.sleep(0.016)
 
-    def reset(self):
+    def reset(self, scenario: int=None):
         self.num_steps = 0
 
-        scenario = self.scenario_map()[self.scenario()]
+        if scenario is not None:
+            scenario = self.scenario_map()[scenario]
+        else:            
+            scenario = self.scenario_map()[self.scenario()]
+            
         self.scenarioName = scenario["name"]
         self.info["scenario"] = self.scenarioName
 
@@ -640,6 +645,7 @@ class RLCrossingSim(gym.Env):
                 [self.vehicle.sprite.rect],
                 [self.traffic.sprite.rect],  # padding for single vehicle scenario
                 [self.pedestrian.sprite.rect],
+                [self.vehicle.sprite.objective],
             ],
         )
 
