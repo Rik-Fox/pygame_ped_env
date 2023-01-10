@@ -192,6 +192,7 @@ class KeyboardVehicle(Vehicle):
 
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
         self.rect.x += start_offset
+        self.init_pos = [self.rect.x, self.rect.y]
         self.moved = [np.array([0, 0])]
         self.replay = False
         if load_path:
@@ -319,22 +320,42 @@ class RandomPedestrian(Pedestrian):
 
 class KeyboardPedestrian(Pedestrian):
     def __init__(self, x, y, init_direction, *groups: AbstractGroup) -> None:
+
         super().__init__(x, y, init_direction, *groups)
+
+        self.init_pos = [self.rect.x, self.rect.y]
+        self.moved = [np.array([0, 0])]
 
     def update(self):
         assert pygame.get_init(), "Keyboard agent cannot be used while headless"
 
         keys = pygame.key.get_pressed()
+        # pad moved for no input steps
+        if not any(keys):
+            self.moved.append(np.array([0, 0]))
 
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
             self.rect.y += self.speed
+            self.moved.append(np.array([0, 1]))
             self.animate("down")
         if keys[pygame.K_UP] or keys[pygame.K_w]:
             self.rect.y -= self.speed
+            self.moved.append(np.array([0, -1]))
             self.animate("up")
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
             self.rect.x += self.speed
+            self.moved.append(np.array([1, 0]))
             self.animate("right")
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.rect.x -= self.speed
+            self.moved.append(np.array([-1, 0]))
             self.animate("left")
+
+    def save(self, file):
+        save_dict = {
+            "direction": self.get_direction(),
+            "moved": self.moved,
+            "init_pos": self.init_pos,
+        }
+        with open(file, "wb+") as filePath:
+            pickle.dump(save_dict, filePath)

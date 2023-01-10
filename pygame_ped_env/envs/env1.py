@@ -2,6 +2,7 @@ import time
 import pygame
 import sys
 import os
+import json
 import gym
 import numpy as np
 
@@ -87,11 +88,11 @@ class RLCrossingSim(gym.Env):
         self.roads = Group()
         self.generateRoads()
 
-        if not self.headless:
-            pygame.init()
-            self.screen = pygame.display.set_mode(self.screen_rect.size)
-            pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
-            self.background = self.generateBackground()
+        # if not self.headless:
+        #     pygame.init()
+        #     self.screen = pygame.display.set_mode(self.screen_rect.size)
+        #     pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
+        #     self.background = self.generateBackground()
 
         # load given model
         try:
@@ -489,14 +490,13 @@ class RLCrossingSim(gym.Env):
         # hacky way to have ~60 FPS TODO: implentment properly
         time.sleep(0.016)
 
-    def reset(self, scenario: int=None):
+    def reset(self, scenario: int = None):
         self.num_steps = 0
 
         if scenario is not None:
             scenario = self.scenario_map()[scenario]
-        else:            
+        else:
             scenario = self.scenario_map()[self.scenario()]
-            
         self.scenarioName = scenario["name"]
         self.info["scenario"] = self.scenarioName
 
@@ -668,8 +668,29 @@ class RLCrossingSim(gym.Env):
                 self.render()
         pygame.quit()
 
+    def close(self, saveDir=None, info=None):
+        if not self.headless:
+            pygame.display.quit()
+            pygame.quit()
+            # sys.exit()
+
+        if saveDir is None:
+            saveDir = self.log_path
+
+        try:
+            self.traffic.sprite.save(os.path.join(saveDir, "second_vehicle_agent.pkl"))
+            self.vehicle.sprite.save(os.path.join(saveDir, "first_vehicle_agent.pkl"))
+        except:
+            self.vehicle.sprite.save(os.path.join(saveDir, "vehicle_agent.pkl"))
+
+        self.pedestrian.sprite.save(os.path.join(saveDir, "pedestrian.pkl"))
+
+        if info is not None:
+            with open(os.path.join(saveDir, "env_info.json"), "wb+") as filePath:
+                json.dumps(info, filePath)
+
     @classmethod
-    def init_scenario(cls, scenario, sim_area, training=False, **kwargs):
+    def init_scenario(cls, scenario, sim_area, **kwargs):
 
         # entities = []
         # scen = cls.scenario_map()[scenario]
