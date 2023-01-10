@@ -686,8 +686,9 @@ class RLCrossingSim(gym.Env):
         self.pedestrian.sprite.save(os.path.join(saveDir, "pedestrian.pkl"))
 
         if info is not None:
-            with open(os.path.join(saveDir, "env_info.json"), "wb+") as filePath:
-                json.dumps(info, filePath)
+            with open(os.path.join(saveDir, "env_info.json"), "w+") as filePath:
+                json.dump(info, filePath, ensure_ascii=False, indent=4)
+                # json.dumps() # returns string obj and doesnt save
 
     @classmethod
     def init_scenario(cls, scenario, sim_area, **kwargs):

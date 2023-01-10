@@ -94,11 +94,12 @@ class RLVehicle(Vehicle):
             self.rect.center += np.array([-1, 0])  # just move left
 
     def save(self, file):
+
+        self.model.save(file.split(".")[0])
         save_dict = {
             "direction": self.direction,
             "colour": self.colour,
             "moved": self.moved,
-            "model": self.model,
             "init_pos": self.init_pos,
             "objective": self.objective,
         }
@@ -111,7 +112,7 @@ class RLVehicle(Vehicle):
         self.direction = load_dict["direction"]
         self.colour = load_dict["colour"]
         self.moved = load_dict["moved"]
-        self.model = load_dict["model"]
+        # self.model = load_dict["model"]
         self.init_pos = load_dict["init_pos"]
         self.objective = load_dict["objective"]
         self.replay = True
