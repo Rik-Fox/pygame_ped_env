@@ -77,6 +77,9 @@ class RLCrossingSim(gym.Env):
         self.traffic = GroupSingle(init_sprite)
         self.pedestrian = GroupSingle(init_sprite)
 
+        # hook to hold ped for saving if removed from env
+        self.done_ped = None
+
         if scenarioList is not None:
             self.scenarioList = scenarioList
         else:
@@ -233,7 +236,9 @@ class RLCrossingSim(gym.Env):
 
         if isinstance(agent.sprite, KeyboardVehicle):
             done = False
-            if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
+            if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
+                self.done_ped = self.pedestrian.sprite
+                self.pedestrian.remove(self.pedestrian.sprite)
                 self.info["done_cause"] = "hit_pedestrian"
                 done = True
             if pygame.sprite.spritecollide(agent.sprite, self.traffic, True):
@@ -263,7 +268,9 @@ class RLCrossingSim(gym.Env):
         collide_rwd = 0  # 0 no collision, -1 offroad, -infty hit pedestrian
 
         # if run over pedestrian, give reward reduction and end episode
-        if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
+        if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
+            self.done_ped = self.pedestrian.sprite
+            self.pedestrian.remove(self.pedestrian.sprite)
             return -10000, True
 
         on_road = 0.01
@@ -287,7 +294,9 @@ class RLCrossingSim(gym.Env):
         collide_rwd = 0  # 0 no collision, -1 offroad, -infty hit pedestrian
 
         # if run over pedestrian, give reward reduction and end episode
-        if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, True):
+        if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
+            self.done_ped = self.pedestrian.sprite
+            self.pedestrian.remove(self.pedestrian.sprite)
             collide_rwd = -10000
             self.info["done_cause"] = "hit_pedestrian"
             done = True
@@ -373,9 +382,13 @@ class RLCrossingSim(gym.Env):
             # self.vehicle.sprite.act([[6], None]) # just move right for testing without trained model
         # print(self.vehicle.sprite.rect)
         self.traffic.sprite.update(self.traffic_action)
-        if pygame.sprite.spritecollide(
-            self.traffic.sprite, self.vehicle, False
-        ) or pygame.sprite.spritecollide(self.traffic.sprite, self.pedestrian, False):
+        if pygame.sprite.spritecollide(self.traffic.sprite, self.vehicle, False):
+            self.traffic.empty()
+            self.traffic.add(Sprite())
+            self.traffic.sprite.rect = pygame.Rect(0, 0, 0, 0)
+        if pygame.sprite.spritecollide(self.traffic.sprite, self.pedestrian, False):
+            self.done_ped = self.pedestrian.sprite
+            self.pedestrian.remove(self.pedestrian.sprite)
             self.traffic.empty()
             self.traffic.add(Sprite())
             self.traffic.sprite.rect = pygame.Rect(0, 0, 0, 0)
@@ -444,6 +457,7 @@ class RLCrossingSim(gym.Env):
             # if vehicle not done, check for ped offscreen
             if not self.done:
                 if not self.screen_rect.contains(self.pedestrian.sprite):
+                    self.done_ped = self.pedestrian.sprite
                     self.pedestrian.remove(self.pedestrian.sprite)
 
         if self.H_collect and self.done and self.scenarioName != "H2":
@@ -683,7 +697,10 @@ class RLCrossingSim(gym.Env):
         except:
             self.vehicle.sprite.save(os.path.join(saveDir, "vehicle_agent.pkl"))
 
-        self.pedestrian.sprite.save(os.path.join(saveDir, "pedestrian.pkl"))
+        try:
+            self.pedestrian.sprite.save(os.path.join(saveDir, "pedestrian.pkl"))
+        except:
+            self.done_ped.save(os.path.join(saveDir, "pedestrian.pkl"))
 
         if info is not None:
             with open(os.path.join(saveDir, "env_info.json"), "w+") as filePath:

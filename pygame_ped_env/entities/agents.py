@@ -195,6 +195,11 @@ class KeyboardVehicle(Vehicle):
         self.rect.x += start_offset
         self.init_pos = [self.rect.x, self.rect.y]
         self.moved = [np.array([0, 0])]
+
+        # here objective is just a place holder variable
+        # to allow env to work with no RL vehicle
+        self.objective = np.array(np.array([0, 0]))
+
         self.replay = False
         if load_path:
             self.load(load_path)
