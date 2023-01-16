@@ -1,5 +1,6 @@
 import sys
 import time
+from collections import deque
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
@@ -7,7 +8,7 @@ import numpy as np
 import torch as th
 from gym import spaces
 from stable_baselines3.common import utils
-from stable_baselines3.common.buffers import RolloutBuffer
+from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.callbacks import (
     BaseCallback,
     CallbackList,
@@ -17,13 +18,22 @@ from stable_baselines3.common.callbacks import (
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
-from stable_baselines3.common.utils import (
-    explained_variance,
-    get_schedule_fn,
-    obs_as_tensor,
-    safe_mean,
-)
+from stable_baselines3.common.vec_env import VecEnv
+from torch.nn import functional as F
 
+from stable_baselines3.common.buffers import ReplayBuffer
+from stable_baselines3.common.preprocessing import maybe_transpose
+from stable_baselines3.common.noise import ActionNoise, VectorizedActionNoise
+from stable_baselines3.common.policies import BasePolicy
+from stable_baselines3.common.type_aliases import (
+    RolloutReturn,
+    TrainFreq,
+    TrainFrequencyUnit,
+)
+from stable_baselines3.common import utils
+from stable_baselines3.common.noise import ActionNoise
+
+from stable_baselines3.her.her_replay_buffer import HerReplayBuffer
 from sb3_contrib.common.maskable.buffers import (
     MaskableDictRolloutBuffer,
     MaskableRolloutBuffer,
@@ -175,25 +185,25 @@ class MaskableDQN(OffPolicyAlgorithm):
         if not isinstance(self.policy, MaskableActorCriticPolicy):
             raise ValueError("Policy must subclass MaskableActorCriticPolicy")
 
-        self.rollout_buffer = buffer_cls(
-            self.n_steps,
-            self.observation_space,
-            self.action_space,
-            self.device,
-            gamma=self.gamma,
-            gae_lambda=self.gae_lambda,
-            n_envs=self.n_envs,
-        )
+        # self.rollout_buffer = buffer_cls(
+        #     self.n_steps,
+        #     self.observation_space,
+        #     self.action_space,
+        #     self.device,
+        #     gamma=self.gamma,
+        #     gae_lambda=self.gae_lambda,
+        #     n_envs=self.n_envs,
+        # )
 
         self.policy = self.policy.to(self.device)
         super()._setup_model()
         self._create_aliases()
         # Copy running stats, see GH issue #996
-        self.batch_norm_stats = get_parameters_by_name(self.q_net, ["running_"])
-        self.batch_norm_stats_target = get_parameters_by_name(
+        self.batch_norm_stats = utils.get_parameters_by_name(self.q_net, ["running_"])
+        self.batch_norm_stats_target = utils.get_parameters_by_name(
             self.q_net_target, ["running_"]
         )
-        self.exploration_schedule = get_linear_fn(
+        self.exploration_schedule = utils.get_linear_fn(
             self.exploration_initial_eps,
             self.exploration_final_eps,
             self.exploration_fraction,
@@ -398,7 +408,7 @@ class MaskableDQN(OffPolicyAlgorithm):
         callback.on_rollout_start()
         continue_training = True
 
-        while should_collect_more_steps(
+        while utils.should_collect_more_steps(
             train_freq, num_collected_steps, num_collected_episodes
         ):
             if (
@@ -500,7 +510,7 @@ class MaskableDQN(OffPolicyAlgorithm):
             (used in recurrent policies)
         """
         if not deterministic and np.random.rand() < self.exploration_rate:
-            if is_vectorized_observation(
+            if utils.is_vectorized_observation(
                 maybe_transpose(observation, self.observation_space),
                 self.observation_space,
             ):
@@ -523,11 +533,55 @@ class MaskableDQN(OffPolicyAlgorithm):
         return action, state
 
     def train(self, gradient_steps: int, batch_size: int) -> None:
-        """
-        Sample the replay buffer and do the updates
-        (gradient descent and update target networks)
-        """
-        raise NotImplementedError()
+        # Switch to train mode (this affects batch norm / dropout)
+        self.policy.set_training_mode(True)
+        # Update learning rate according to schedule
+        self._update_learning_rate(self.policy.optimizer)
+
+        losses = []
+        for _ in range(gradient_steps):
+            # Sample replay buffer
+            replay_data = self.replay_buffer.sample(
+                batch_size, env=self._vec_normalize_env
+            )
+
+            with th.no_grad():
+                # Compute the next Q-values using the target network
+                next_q_values = self.q_net_target(replay_data.next_observations)
+                # Follow greedy policy: use the one with the highest value
+                next_q_values, _ = next_q_values.max(dim=1)
+                # Avoid potential broadcast issue
+                next_q_values = next_q_values.reshape(-1, 1)
+                # 1-step TD target
+                target_q_values = (
+                    replay_data.rewards
+                    + (1 - replay_data.dones) * self.gamma * next_q_values
+                )
+
+            # Get current Q-values estimates
+            current_q_values = self.q_net(replay_data.observations)
+
+            # Retrieve the q-values for the actions from the replay buffer
+            current_q_values = th.gather(
+                current_q_values, dim=1, index=replay_data.actions.long()
+            )
+
+            # Compute Huber loss (less sensitive to outliers)
+            loss = F.smooth_l1_loss(current_q_values, target_q_values)
+            losses.append(loss.item())
+
+            # Optimize the policy
+            self.policy.optimizer.zero_grad()
+            loss.backward()
+            # Clip gradient norm
+            th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
+            self.policy.optimizer.step()
+
+        # Increase update counter
+        self._n_updates += gradient_steps
+
+        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
+        self.logger.record("train/loss", np.mean(losses))
 
     def _on_step(self) -> None:
         """
@@ -536,11 +590,13 @@ class MaskableDQN(OffPolicyAlgorithm):
         """
         self._n_calls += 1
         if self._n_calls % self.target_update_interval == 0:
-            polyak_update(
+            utils.polyak_update(
                 self.q_net.parameters(), self.q_net_target.parameters(), self.tau
             )
             # Copy running stats, see GH issue #996
-            polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
+            utils.polyak_update(
+                self.batch_norm_stats, self.batch_norm_stats_target, 1.0
+            )
 
         self.exploration_rate = self.exploration_schedule(
             self._current_progress_remaining
