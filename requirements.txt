@@ -70,7 +70,6 @@ oauthlib==3.2.0
 opencv-python==4.3.0.36
 openpyxl==3.0.10
 otree==5.9.7
-paavi==0.3.1
 packaging==21.3
 pandas==1.4.3
 parso==0.8.3
@@ -88,7 +87,6 @@ pyasn1-modules==0.2.8
 pycparser==2.21
 pydantic==1.9.1
 pygame==2.1.2
--e git+git@github.com:Rik-Fox/pygame_ped_env.git@b4ea658c0896785478c2900ecf76fc53df036c10#egg=pygame_ped_env
 pyglet==1.4.11
 pygls==0.12.1
 Pygments==2.12.0

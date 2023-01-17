@@ -152,6 +152,21 @@ class RLCrossingSim(gym.Env):
 
         self.num_steps = 0
 
+    def valid_action_mask(self):
+        mask = np.ones(self.action_space.n)
+        for action in range(self.action_space.n):
+            mapped_action = (
+                self.vehicle.sprite.action_map[action % 8]
+                * self.vehicle.sprite.speed_map[np.floor(action / 8)]
+            )
+            next_pos = self.vehicle.sprite.rect.center + mapped_action
+            if not self.screen_rect.collidepoint(next_pos):
+                mask[action] = False
+            else:
+                mask[action] = True
+
+        return mask
+
     def get_max_reward(self, shaped_reward=True):
         # highest possible reward for both cases
         if not shaped_reward:

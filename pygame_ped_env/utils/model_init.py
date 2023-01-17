@@ -4,8 +4,9 @@ import numpy as np
 
 from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
+from pygame_ped_env.entities import MaskableDQN
 
-from stable_baselines3 import A2C, PPO
+from stable_baselines3 import A2C, PPO, DQN
 
 
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy

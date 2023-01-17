@@ -372,9 +372,9 @@ class MaskableDQN(OffPolicyAlgorithm):
         :return:
         """
 
-        assert isinstance(
-            rollout_buffer, (MaskableRolloutBuffer, MaskableDictRolloutBuffer)
-        ), "RolloutBuffer doesn't support action masking"
+        # assert isinstance(
+        #     rollout_buffer, (MaskableRolloutBuffer, MaskableDictRolloutBuffer)
+        # ), "RolloutBuffer doesn't support action masking"
         assert self._last_obs is not None, "No previous observation was provided"
         # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
@@ -424,7 +424,7 @@ class MaskableDQN(OffPolicyAlgorithm):
                 action_masks = get_action_masks(env)
 
             actions, values, log_probs = self.policy(
-                obs_tensor, action_masks=action_masks
+                self._last_obs, action_masks=action_masks
             )
 
             # Select action randomly or according to policy
@@ -449,7 +449,6 @@ class MaskableDQN(OffPolicyAlgorithm):
                 )
 
             # Retrieve reward and episode length if using Monitor wrapper
-
             self._update_info_buffer(infos, dones)
 
             # Store data in replay buffer (normalized action and unnormalized observation)
@@ -738,13 +737,15 @@ class MaskableDQN(OffPolicyAlgorithm):
         ):
             # Warmup phase
             unscaled_action = np.array(
-                [self.action_space.sample() for _ in range(n_envs)]
+                [self.action_space[action_masks].sample() for _ in range(n_envs)]
             )
         else:
             # Note: when using continuous actions,
             # we assume that the policy uses tanh to scale the action
             # We use non-deterministic action in the case of SAC, for TD3, it does not matter
-            unscaled_action, _ = self.predict(self._last_obs, deterministic=False)
+            unscaled_action, _ = self.predict(
+                self._last_obs, deterministic=False, action_masks=action_masks
+            )
 
         # Rescale the action from [low, high] to [-1, 1]
         if isinstance(self.action_space, spaces.Box):
