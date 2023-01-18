@@ -4,7 +4,7 @@ import numpy as np
 
 from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
-from pygame_ped_env.entities import MaskableDQN
+from pygame_ped_env.entities.maskedDQN import MaskableDQN
 
 from stable_baselines3 import A2C, PPO, DQN
 
@@ -93,7 +93,10 @@ def model_init(args=param_parser.parse_args()):
     # retrieved and used when learning. Note that MaskablePPO does not accept
     # a new action_mask_fn kwarg, as it did in an earlier draft.
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)
-    model.save(os.path.join(log_path, "masekd_ppo_init_model"))
+    model.save(os.path.join(log_path, "masked_ppo_init_model"))
+
+    model = MaskableDQN(MaskableActorCriticPolicy, env, verbose=1)
+    model.save(os.path.join(log_path, "masked_dqn_init_model"))
 
 
 if __name__ == "__main__":

@@ -714,7 +714,7 @@ class MaskableDQN(OffPolicyAlgorithm):
         learning_starts: int,
         action_noise: Optional[ActionNoise] = None,
         n_envs: int = 1,
-        action_masks: List(bool) = True,
+        action_masks: Optional[np.ndarray] = None,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Sample an action according to the exploration policy.

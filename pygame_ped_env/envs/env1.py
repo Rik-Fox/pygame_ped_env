@@ -268,7 +268,7 @@ class RLCrossingSim(gym.Env):
             p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
 
             # linearly combine rewards
-            # apply convex or concave adjustment, and then shift to (-1,0]
+            # apply convex or concave adjustment, and then shift to [-1,0)
             rwd = (
                 (np.power(p_rwd, self.pos_coeff) - 1)
                 + (np.power(s_rwd, self.speed_coeff) - 1)
@@ -286,7 +286,8 @@ class RLCrossingSim(gym.Env):
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
             self.done_ped = self.pedestrian.sprite
             self.pedestrian.remove(self.pedestrian.sprite)
-            return -10000, True
+            self.info["done_cause"] = "hit_pedestrian"
+            return -np.infty, True
 
         on_road = 0.01
         if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
@@ -312,7 +313,7 @@ class RLCrossingSim(gym.Env):
         if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
             self.done_ped = self.pedestrian.sprite
             self.pedestrian.remove(self.pedestrian.sprite)
-            collide_rwd = -10000
+            collide_rwd = -np.infty
             self.info["done_cause"] = "hit_pedestrian"
             done = True
 
@@ -322,37 +323,17 @@ class RLCrossingSim(gym.Env):
             # collide_rwd = -0.5
 
         # distance from end point
-        curr_d_obj = agent.sprite.dist_to_objective()
+        dist_to_obj = agent.sprite.dist_to_objective()
         # if we have reached the destination, give max rwd
-        if (curr_d_obj == np.zeros(2)).all():
+        if (dist_to_obj == np.zeros(2)).all():
             # rwd for hitting goal
             position_rwd = self.get_max_reward(self.simple_reward)
             self.info["done_cause"] = "objective_reached"
             done = True
         else:
-            # straight line vector from start to goal
-            init_d_obj = agent.sprite.dist_to_objective(pos=agent.sprite.init_pos)
-
-            # magnitudes of init and curr vectors to goal
-            rho_init = np.hypot(init_d_obj[0], init_d_obj[1])
-            rho_curr = np.hypot(curr_d_obj[0], curr_d_obj[1])
-
-            # normalised difference in vector magnitudes
-            rho_scaled = (rho_init - rho_curr) / rho_init
-
-            # angle between stright line to goal and curent path to goal
-            # in (0, pi]
-            theta_diff = np.arccos(
-                np.dot(init_d_obj, curr_d_obj) / (rho_init * rho_curr)
-            )
-
-            # recale to have theta in (0,1]
-            theta_scaled = (np.pi - theta_diff) / np.pi
-
-            # reward is linear combination of normed rho and theta
-            # rho_scaled rewards for progression to goal (degined to be along x axis)
-            # theta_scaled punishes for deviation from stright path (degined to be along y axis)
-            position_rwd = (rho_scaled + theta_scaled) / 2
+            position_rwd = -np.linalg.norm(
+                dist_to_obj, ord=1
+            )  # ord=1 is manhattan distance
 
         # movement vector magnitude for this action
         delta_rho_1 = np.hypot(agent.sprite.moved[-1][0], agent.sprite.moved[-1][1])
@@ -443,37 +424,24 @@ class RLCrossingSim(gym.Env):
 
         # remove vehicles once they drive offscreen and finish episode
         if not self.done:
-            veh_rect = self.vehicle.sprite.rect
-            if not (
-                0 - veh_rect.h <= veh_rect.centery <= self.screen_rect.h + veh_rect.h
-            ):
-                if isinstance(self.vehicle.sprite, KeyboardVehicle):
-                    rwd = 0.0
-                # if not roughly at destination then punish
-                elif not (
-                    self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
-                ).all():
-                    rwd -= 3000
-                self.info["done_cause"] = "vehicle_offscreen"
-                self.done = True
-            elif not (
-                0 - veh_rect.w <= veh_rect.centerx <= self.screen_rect.w + veh_rect.w
-            ):
-                if isinstance(self.vehicle.sprite, KeyboardVehicle):
-                    rwd = 0.0
-                # if not roughly at destination then punish
-                elif not (
-                    self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
-                ).all():
-                    rwd -= 3000
-                self.info["done_cause"] = "vehicle_offscreen"
-                self.done = True
+            ### should be handled by valid_action_mask now ###
+
+            # veh_pos = self.vehicle.sprite.rect.center
+            # if not self.screen_rect.collidepoint(veh_pos):
+            #     if isinstance(self.vehicle.sprite, KeyboardVehicle):
+            #         rwd = 0.0
+            #     # if not roughly at destination then punish
+            #     elif not (
+            #         self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
+            #     ).all():
+            #         rwd -= 3000
+            #     self.info["done_cause"] = "vehicle_offscreen"
+            #     self.done = True
 
             # if vehicle not done, check for ped offscreen
-            if not self.done:
-                if not self.screen_rect.contains(self.pedestrian.sprite):
-                    self.done_ped = self.pedestrian.sprite
-                    self.pedestrian.remove(self.pedestrian.sprite)
+            if not self.screen_rect.contains(self.pedestrian.sprite):
+                self.done_ped = self.pedestrian.sprite
+                self.pedestrian.remove(self.pedestrian.sprite)
 
         if self.H_collect and self.done and self.scenarioName != "H2":
             # save trajectory
