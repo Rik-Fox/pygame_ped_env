@@ -4,7 +4,7 @@ import numpy as np
 
 from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
-from pygame_ped_env.entities.maskedDQN import MaskableDQN
+from pygame_ped_env.entities.maskedDQN import MaskableDQNPolicy, MaskableDQN
 
 from stable_baselines3 import A2C, PPO, DQN
 
@@ -95,7 +95,7 @@ def model_init(args=param_parser.parse_args()):
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)
     model.save(os.path.join(log_path, "masked_ppo_init_model"))
 
-    model = MaskableDQN(MaskableActorCriticPolicy, env, verbose=1)
+    model = MaskableDQN(MaskableDQNPolicy, env, verbose=1)
     model.save(os.path.join(log_path, "masked_dqn_init_model"))
 
 
