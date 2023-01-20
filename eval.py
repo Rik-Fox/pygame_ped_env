@@ -1,7 +1,17 @@
 import os
+import gym
+import numpy as np
 
 from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
+from sb3_contrib.common.wrappers import ActionMasker
+
+
+def mask_fn(env: gym.Env) -> np.ndarray:
+    # Do whatever you'd like in this function to return the action mask
+    # for the current env. In this example, we assume the env has a
+    # helpful method we can rely on.
+    return env.valid_action_mask()
 
 
 def Eval(args=param_parser.parse_args()):
@@ -31,7 +41,7 @@ def Eval(args=param_parser.parse_args()):
     # must use correct scenario set otherwise will be updated for rewards
     # recieved by other models actions; these varibles switch to the shaped model
     # and all it's appropriate scenarios etc to train with only a boolean flag
-    if not args.simple_agent:
+    if args.shaped_agent:
         # attribute based reward agent
         args.model_name = "shaped_reward_agent"
         args.scenarioList = [*range(0, 8)]
@@ -43,7 +53,7 @@ def Eval(args=param_parser.parse_args()):
     )
     os.makedirs(log_path, exist_ok=True)
 
-    scenarios = [16, 17, 18]
+    scenarios = [0, 1]
 
     env = RLCrossingSim(
         sim_area=args.sim_area,
@@ -53,7 +63,8 @@ def Eval(args=param_parser.parse_args()):
         human_controlled_car=args.human_controlled_car,
         # headless=args.headless,
         headless=False,
-        seed=args.seed,
+        # seed=args.seed,
+        seed=257,
         basic_model=args.basic_model,
         attr_model=args.attr_model,
         log_path=log_path,
@@ -61,6 +72,7 @@ def Eval(args=param_parser.parse_args()):
         position_coefficient=args.position_coefficient,
         steering_coefficient=args.steering_coefficient,
     )
+    env = ActionMasker(env, mask_fn)
     n_episodes = 10
 
     # for ep in range(args.n_episodes):

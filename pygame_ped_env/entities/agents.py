@@ -15,10 +15,10 @@ class RLVehicle(Vehicle):
     ) -> None:
 
         if direction == "right":
-            start = [0, window_size[1] / 2]
+            start = [0 + 500, window_size[1] / 2]
             end = [window_size[0], window_size[1] / 2]
         elif direction == "left":
-            start = [window_size[0], window_size[1] / 2]
+            start = [window_size[0] - 500, window_size[1] / 2]
             end = [0, window_size[1] / 2]
         else:
             raise AttributeError(
@@ -131,8 +131,10 @@ class RandomVehicle(Vehicle):
     ) -> None:
         if direction == "right":
             start = [0, window_size[1] / 2]
+            start_offset = 100
         elif direction == "left":
             start = [window_size[0], window_size[1] / 2]
+            start_offset = -100
         else:
             raise AttributeError(
                 'Only "left" and "right" directions are implemented for vehicles'

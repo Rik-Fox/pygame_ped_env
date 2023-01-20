@@ -59,10 +59,8 @@ class MaskableDQNPolicy(BasePolicy):
         observation_space: spaces.Space,
         action_space: spaces.Space,
         lr_schedule: Schedule,
-        net_arch: Union[
-            List[int], Dict[str, List[int]], List[Dict[str, List[int]]], None
-        ] = None,
-        activation_fn: Type[nn.Module] = nn.Tanh,
+        net_arch: Optional[List[int]] = None,
+        activation_fn: Type[nn.Module] = nn.ReLU,
         features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
         normalize_images: bool = True,
@@ -154,6 +152,7 @@ class MaskableDQNPolicy(BasePolicy):
         #     latent_vf = self.mlp_extractor.forward_critic(vf_features)
         # # Evaluate the values for the given observations
         # values = self.value_net(latent_vf)
+
         action_logits = self.action_net(self.q_net(obs))
         distribution = self.action_dist.proba_distribution(action_logits=action_logits)
 
@@ -163,11 +162,35 @@ class MaskableDQNPolicy(BasePolicy):
         log_prob = distribution.log_prob(actions)
         return actions, log_prob
 
-    def forward(self, obs: th.Tensor, deterministic: bool = True) -> th.Tensor:
-        return self._predict(obs, deterministic=deterministic)
-
     def _predict(self, obs: th.Tensor, deterministic: bool = True) -> th.Tensor:
         return self.q_net._predict(obs, deterministic=deterministic)
+        # actions, probs = self.forward(obs, deterministic=deterministic)
+
+    def _get_constructor_parameters(self) -> Dict[str, Any]:
+        data = super()._get_constructor_parameters()
+
+        data.update(
+            dict(
+                net_arch=self.net_arch,
+                activation_fn=self.activation_fn,
+                lr_schedule=self._dummy_schedule,  # dummy lr schedule, not needed for loading policy alone
+                optimizer_class=self.optimizer_class,
+                optimizer_kwargs=self.optimizer_kwargs,
+                features_extractor_class=self.features_extractor_class,
+                features_extractor_kwargs=self.features_extractor_kwargs,
+            )
+        )
+
+        def set_training_mode(self, mode: bool) -> None:
+            """
+            Put the policy in either training or evaluation mode.
+
+            This affects certain modules, such as batch normalisation and dropout.
+
+            :param mode: if true, set to training mode, else set to evaluation mode
+            """
+            self.q_net.set_training_mode(mode)
+            self.training = mode
 
 
 SelfMaskableDQN = TypeVar("SelfMaskableDQN", bound="MaskableDQN")

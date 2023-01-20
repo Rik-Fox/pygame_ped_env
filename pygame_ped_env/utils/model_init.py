@@ -24,11 +24,14 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 def model_init(args=param_parser.parse_args()):
 
     # if log path not specificed then set to default outside of code folder
+    print(args.log_path)
     if args.log_path is None:
         wkdir = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         )
         args.log_path = os.path.join(wkdir, "logs")
+
+    print(args.log_path)
 
     if args.basic_model is None:
         args.basic_model = os.path.join(
@@ -60,9 +63,10 @@ def model_init(args=param_parser.parse_args()):
         args.model_name,
         "env_eval_logs",
     )
+    print(log_path)
     os.makedirs(log_path, exist_ok=True)
 
-    scenarios = [16, 17, 18]
+    scenarios = [0, 1]
 
     env = RLCrossingSim(
         sim_area=args.sim_area,

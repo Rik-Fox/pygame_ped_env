@@ -426,17 +426,19 @@ class RLCrossingSim(gym.Env):
         if not self.done:
             ### should be handled by valid_action_mask now ###
 
-            # veh_pos = self.vehicle.sprite.rect.center
-            # if not self.screen_rect.collidepoint(veh_pos):
-            #     if isinstance(self.vehicle.sprite, KeyboardVehicle):
-            #         rwd = 0.0
-            #     # if not roughly at destination then punish
-            #     elif not (
-            #         self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
-            #     ).all():
-            #         rwd -= 3000
-            #     self.info["done_cause"] = "vehicle_offscreen"
-            #     self.done = True
+            veh_pos = self.vehicle.sprite.rect.center
+            if not self.screen_rect.collidepoint(veh_pos):
+                print("OFFSCREEN!!!")
+                self.done = True
+                # if isinstance(self.vehicle.sprite, KeyboardVehicle):
+                #     rwd = 0.0
+                # # if not roughly at destination then punish
+                # elif not (
+                #     self.vehicle.sprite.dist_to_objective() <= np.ones(2) * 3
+                # ).all():
+                #     rwd -= 3000
+                # self.info["done_cause"] = "vehicle_offscreen"
+                # self.done = True
 
             # if vehicle not done, check for ped offscreen
             if not self.screen_rect.contains(self.pedestrian.sprite):
