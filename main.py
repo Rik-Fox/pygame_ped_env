@@ -1,7 +1,10 @@
 import os
+import gym
+import numpy as np
 
 from stable_baselines3.common.env_util import make_vec_env
 import stable_baselines3.common.callbacks as clbks
+from sb3_contrib.common.wrappers import ActionMasker
 
 #     EvalCallback,
 #     StopTrainingOnMaxEpisodes,
@@ -15,39 +18,14 @@ from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
 from pygame_ped_env.utils.custom_logging import CustomTrackingCallback
 
+def mask_fn(env: gym.Env) -> np.ndarray:
+    # Do whatever you'd like in this function to return the action mask
+    # for the current env. In this example, we assume the env has a
+    # helpful method we can rely on.
+    return env.valid_action_mask()
+
 
 def Main(args=param_parser.parse_args()):
-
-    # if log path not specificed then set to default outside of code folder
-    if args.log_path is None:
-        wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        args.log_path = os.path.join(wkdir, "logs")
-
-    if args.basic_model is None:
-        args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "init_model"
-        )
-
-    if args.eval_basic_model is None:
-        args.eval_basic_model = args.basic_model
-
-    if args.attr_model is None:
-        args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "init_model"
-        )
-
-    if args.eval_attr_model is None:
-        args.eval_attr_model = args.attr_model
-
-    ### IMPORTANT ###
-    # must use correct scenario set otherwise will be updated for rewards
-    # recieved by other models actions; these varibles switch to the shaped model
-    # and all it's appropriate scenarios etc to train with only a boolean flag
-    if args.shaped_agent:
-        # attribute based reward agent
-        args.model_name = "shaped_reward_agent"
-        args.scenarioList = [*range(0, 8)]
-        args.eval_scenarioList = [*range(0, 8)]
 
     log_path = os.path.join(
         args.log_path,
@@ -87,9 +65,12 @@ def Main(args=param_parser.parse_args()):
             "position_coefficient": args.position_coefficient,
             "steering_coefficient": args.steering_coefficient,
         },
+        wrapper_class= ActionMasker,
+        wrapper_kwargs= {"action_mask_fn": mask_fn},
         seed=args.seed,
         monitor_dir=monitor_path,
     )
+    # env = ActionMasker(env, mask_fn)  # Wrap to enable masking
     env.reset()
 
     eval_env = make_vec_env(
@@ -122,7 +103,7 @@ def Main(args=param_parser.parse_args()):
                 ),
             ),
             clbks.CheckpointCallback(
-                args.checkpoint_interval * args.n_envs,
+                args.checkpoint_interval,
                 os.path.join(log_path, args.checkpoint_dirname),
                 name_prefix=args.checkpoint_filename_prefix,
                 verbose=args.verbose,
@@ -142,7 +123,7 @@ def Main(args=param_parser.parse_args()):
                     * 0.98
                 ),
                 n_eval_episodes=args.eval_episodes,
-                eval_freq=args.eval_interval * args.eval_n_envs,
+                eval_freq=args.eval_interval,
                 log_path=log_path,
                 best_model_save_path=os.path.join(eval_log_path, "best"),
                 render=args.eval_render,
@@ -161,4 +142,47 @@ def Main(args=param_parser.parse_args()):
 
 
 if __name__ == "__main__":
-    Main(args=param_parser.parse_args())
+    
+    args=param_parser.parse_args()
+
+    # if log path not specificed then set to default outside of code folder
+    if args.log_path is None:
+        wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        args.log_path = os.path.join(wkdir, "logs")
+
+    if args.basic_model is None:
+        args.basic_model = os.path.join(
+            args.log_path, "simple_reward_agent", "init_model"
+        )
+
+    if args.eval_basic_model is None:
+        args.eval_basic_model = args.basic_model
+
+    if args.attr_model is None:
+        args.attr_model = os.path.join(
+            args.log_path, "shaped_reward_agent", "init_model"
+        )
+
+    if args.eval_attr_model is None:
+        args.eval_attr_model = args.attr_model
+        
+    if args.scenarioList is None:
+        if args.shaped_agent:
+            args.scenarioList = [*range(0, 8)]
+            args.eval_scenarioList = [*range(0, 8)]
+        else:
+            args.scenarioList = [*range(8, 16)]
+            args.eval_scenarioList = [*range(8, 16)]
+    else:
+        args.scenarioList = [int(i) for i in args.scenarioList]
+        args.eval_scenarioList = args.scenarioList
+
+    ### IMPORTANT ###
+    # must use correct scenario set otherwise will be updated for rewards
+    # recieved by other models actions; these varibles switch to the shaped model
+    # and all it's appropriate scenarios etc to train with only a boolean flag
+    if args.shaped_agent:
+        # attribute based reward agent
+        args.model_name = "shaped_reward_agent"
+        
+    Main(args=args)

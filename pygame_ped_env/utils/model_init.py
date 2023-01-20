@@ -20,18 +20,29 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     # helpful method we can rely on.
     return env.valid_action_mask()
 
+from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
+from sb3_contrib.common.wrappers import ActionMasker
+from sb3_contrib.ppo_mask import MaskablePPO
+
+
+def mask_fn(env: gym.Env) -> np.ndarray:
+    # Do whatever you'd like in this function to return the action mask
+    # for the current env. In this example, we assume the env has a
+    # helpful method we can rely on.
+    return env.valid_action_mask()
+
+
+
 
 def model_init(args=param_parser.parse_args()):
 
     # if log path not specificed then set to default outside of code folder
-    print(args.log_path)
     if args.log_path is None:
         wkdir = os.path.dirname(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         )
         args.log_path = os.path.join(wkdir, "logs")
 
-    print(args.log_path)
 
     if args.basic_model is None:
         args.basic_model = os.path.join(
@@ -61,9 +72,7 @@ def model_init(args=param_parser.parse_args()):
     log_path = os.path.join(
         args.log_path,
         args.model_name,
-        "env_eval_logs",
     )
-    print(log_path)
     os.makedirs(log_path, exist_ok=True)
 
     scenarios = [0, 1]
@@ -89,7 +98,8 @@ def model_init(args=param_parser.parse_args()):
 
     model = PPO("MlpPolicy", env, verbose=1)
     model.save(os.path.join(log_path, "ppo_init_model"))
-
+    
+    
     env = ActionMasker(env, mask_fn)  # Wrap to enable masking
 
     # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
