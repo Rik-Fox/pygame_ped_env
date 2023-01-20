@@ -18,6 +18,7 @@ from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
 from pygame_ped_env.utils.custom_logging import CustomTrackingCallback
 
+
 def mask_fn(env: gym.Env) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
@@ -26,6 +27,12 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 
 def Main(args=param_parser.parse_args()):
+
+    args.basic_model = os.path.join(
+        args.log_path, "simple_reward_agent", "env_eval_logs", "masked_dqn_init_model"
+    )
+
+    print(args.basic_model)
 
     log_path = os.path.join(
         args.log_path,
@@ -65,8 +72,8 @@ def Main(args=param_parser.parse_args()):
             "position_coefficient": args.position_coefficient,
             "steering_coefficient": args.steering_coefficient,
         },
-        wrapper_class= ActionMasker,
-        wrapper_kwargs= {"action_mask_fn": mask_fn},
+        wrapper_class=ActionMasker,
+        wrapper_kwargs={"action_mask_fn": mask_fn},
         seed=args.seed,
         monitor_dir=monitor_path,
     )
@@ -142,8 +149,8 @@ def Main(args=param_parser.parse_args()):
 
 
 if __name__ == "__main__":
-    
-    args=param_parser.parse_args()
+
+    args = param_parser.parse_args()
 
     # if log path not specificed then set to default outside of code folder
     if args.log_path is None:
@@ -165,7 +172,7 @@ if __name__ == "__main__":
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
-        
+
     if args.scenarioList is None:
         if args.shaped_agent:
             args.scenarioList = [*range(0, 8)]
@@ -184,5 +191,5 @@ if __name__ == "__main__":
     if args.shaped_agent:
         # attribute based reward agent
         args.model_name = "shaped_reward_agent"
-        
+
     Main(args=args)
