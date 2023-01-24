@@ -6,7 +6,11 @@ import json
 import gym
 import numpy as np
 
-from stable_baselines3 import DQN
+
+from stable_baselines3 import A2C, PPO, DQN
+from pygame_ped_env.entities.maskedDQN import MaskableDQN
+from sb3_contrib.ppo_mask import MaskablePPO
+
 from pygame.sprite import Sprite, Group, GroupSingle
 from typing import Union, Sequence
 
@@ -97,51 +101,8 @@ class RLCrossingSim(gym.Env):
         #     pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
         #     self.background = self.generateBackground()
 
-        # load given model
-        try:
-            self.modelB = DQN.load(basic_model, env=self)
-        # if no or wrong model given
-        except:
-            # load default
-            modelB_path = os.path.join(
-                self.parent_log_path, "simple_reward_agent", "init_model"
-            )
-            try:
-                self.modelB = DQN.load(modelB_path, env=self)
-            # if no default exists make it
-            except:
-                basic_model = DQN(
-                    "MlpPolicy",
-                    self,
-                    verbose=0,
-                    tensorboard_log=os.path.join(
-                        self.parent_log_path, "simple_reward_agent"
-                    ),
-                )
-                basic_model._setup_model()
-                basic_model.save(modelB_path, include="env")
-
-                self.modelB = DQN.load(modelB_path, env=self)
-
-        try:
-            self.modelA = DQN.load(attr_model, env=self)
-        except:
-            modelA_path = os.path.join(
-                self.parent_log_path, "shaped_reward_agent", "init_model"
-            )
-            try:
-                self.modelA = DQN.load(modelA_path, env=self)
-            except:
-                attr_model = DQN(
-                    "MlpPolicy",
-                    self,
-                    verbose=0,
-                    tensorboard_log=os.path.join(
-                        self.parent_log_path, "shaped_reward_agent"
-                    ),
-                )
-                attr_model.save(modelA_path, include="env")
-                self.modelA = DQN.load(modelA_path, env=self)
+        self.modelA = self._load_model_from_string(attr_model)
+        self.modelB = self._load_model_from_string(basic_model)
 
         self.training = not human_controlled_ped
 
@@ -152,7 +113,7 @@ class RLCrossingSim(gym.Env):
 
         self.num_steps = 0
 
-    def valid_action_mask(self):
+    def action_masks(self):
         mask = np.ones(self.action_space.n)
         for action in range(self.action_space.n):
             mapped_action = (
@@ -718,6 +679,51 @@ class RLCrossingSim(gym.Env):
         #     )
 
         return (cls(sim_area, cls.scenario_map()[scenario].agentList, **kwargs),)
+
+    def _load_model_from_string(self, path):
+        name = path.split(os.sep)[-1].split("_")[0]
+        if name == "dqn":
+            alg = DQN
+        elif name == "ppo":
+            alg = PPO
+        elif name == "a2c":
+            alg = A2C
+        elif name == "maskedDQN":
+            alg = MaskableDQN
+        elif name == "maskedPPO":
+            alg = MaskablePPO
+        else:
+            raise ValueError("Unknown model type: " + name)
+
+        try:
+            return alg.load(path, env=self)
+        # if no or wrong model given
+        except FileNotFoundError:
+            # load default
+            init_path = os.path.join(
+                self.parent_log_path, "simple_reward_agent", f"{name}_init_model"
+            )
+            try:
+                model = alg.load(init_path, env=self)
+                print("No model found, loading default model")
+                print("Loading default model from: ", init_path)
+                return model
+            # if no default exists make it
+            except FileNotFoundError:
+                model = alg(
+                    "MlpPolicy",
+                    self,
+                    verbose=0,
+                    tensorboard_log=os.path.join(
+                        self.parent_log_path, "simple_reward_agent"
+                    ),
+                )
+                model._setup_model()
+                model.save(init_path, include="env")
+                print("No model found, nor a default model of this algorithm.")
+                print("Created default and saved to: ", init_path)
+
+                return alg.load(init_path, env=self)
 
     @staticmethod
     def scenario_map():

@@ -23,16 +23,25 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
-    return env.valid_action_mask()
+    return env.action_masks()
 
 
 def Main(args=param_parser.parse_args()):
 
-    args.basic_model = os.path.join(
-        args.log_path, "simple_reward_agent", "env_eval_logs", "masked_dqn_init_model"
-    )
+    args.shaped_agent = True
+    args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_init_model.zip"
+    args.scenarioList = [0, 1]
+    ### IMPORTANT ###
+    # must use correct scenario set otherwise will be updated for rewards
+    # recieved by other models actions; these varibles switch to the shaped model
+    # and all it's appropriate scenarios etc to train with only a boolean flag
+    if args.shaped_agent:
+        # attribute based reward agent
+        args.model_name = "shaped_reward_agent"
 
-    print(args.basic_model)
+    args.basic_model = os.path.join(
+        args.log_path, "simple_reward_agent", "maskedPPO_init_model"
+    )
 
     log_path = os.path.join(
         args.log_path,
@@ -97,6 +106,8 @@ def Main(args=param_parser.parse_args()):
             "position_coefficient": args.eval_position_coefficient,
             "steering_coefficient": args.eval_steering_coefficient,
         },
+        wrapper_class=ActionMasker,
+        wrapper_kwargs={"action_mask_fn": mask_fn},
         seed=args.eval_seed,
         monitor_dir=eval_monitor_path,
     )
@@ -159,7 +170,7 @@ if __name__ == "__main__":
 
     if args.basic_model is None:
         args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "init_model"
+            args.log_path, "simple_reward_agent", "dqn_init_model"
         )
 
     if args.eval_basic_model is None:
@@ -167,7 +178,7 @@ if __name__ == "__main__":
 
     if args.attr_model is None:
         args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "init_model"
+            args.log_path, "shaped_reward_agent", "dqn_init_model"
         )
 
     if args.eval_attr_model is None:
@@ -184,6 +195,9 @@ if __name__ == "__main__":
         args.scenarioList = [int(i) for i in args.scenarioList]
         args.eval_scenarioList = args.scenarioList
 
+    args.shaped_agent = True
+    args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/env_eval_logs/masked_dqn_init_model"
+    args.scenarioList = [0, 1]
     ### IMPORTANT ###
     # must use correct scenario set otherwise will be updated for rewards
     # recieved by other models actions; these varibles switch to the shaped model

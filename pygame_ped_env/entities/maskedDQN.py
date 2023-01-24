@@ -118,7 +118,7 @@ class MaskableDQNPolicy(BasePolicy):
         )
 
         self.action_net = self.action_dist.proba_distribution_net(
-            latent_dim=self.net_arch[-1]
+            latent_dim=self.action_space.n
         )
 
     def make_q_net(self) -> QNetwork:
@@ -574,9 +574,11 @@ class MaskableDQN(OffPolicyAlgorithm):
             if use_masking:
                 action_masks = get_action_masks(env)
 
-            actions, values, log_probs = self.policy(
-                self._last_obs, action_masks=action_masks
-            )
+            with th.no_grad():
+                # Convert to pytorch tensor or to TensorDict
+                obs_tensor = utils.obs_as_tensor(self._last_obs, self.device)
+
+            actions, log_probs = self.policy(obs_tensor, action_masks=action_masks)
 
             # Select action randomly or according to policy
             actions, buffer_actions = self._sample_action(
@@ -887,6 +889,7 @@ class MaskableDQN(OffPolicyAlgorithm):
             self.use_sde and self.use_sde_at_warmup
         ):
             # Warmup phase
+            valid_actions = 
             unscaled_action = np.array(
                 [self.action_space[action_masks].sample() for _ in range(n_envs)]
             )

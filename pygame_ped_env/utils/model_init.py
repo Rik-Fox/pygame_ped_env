@@ -20,6 +20,7 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     # helpful method we can rely on.
     return env.valid_action_mask()
 
+
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from sb3_contrib.common.wrappers import ActionMasker
 from sb3_contrib.ppo_mask import MaskablePPO
@@ -32,8 +33,6 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     return env.valid_action_mask()
 
 
-
-
 def model_init(args=param_parser.parse_args()):
 
     # if log path not specificed then set to default outside of code folder
@@ -43,10 +42,9 @@ def model_init(args=param_parser.parse_args()):
         )
         args.log_path = os.path.join(wkdir, "logs")
 
-
     if args.basic_model is None:
         args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "init_model"
+            args.log_path, "simple_reward_agent", "dqn_init_model"
         )
 
     if args.eval_basic_model is None:
@@ -54,7 +52,7 @@ def model_init(args=param_parser.parse_args()):
 
     if args.attr_model is None:
         args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "init_model"
+            args.log_path, "shaped_reward_agent", "dqn_init_model"
         )
 
     if args.eval_attr_model is None:
@@ -93,13 +91,15 @@ def model_init(args=param_parser.parse_args()):
         steering_coefficient=args.steering_coefficient,
     )
 
+    model = DQN("MlpPolicy", env, verbose=1)
+    model.save(os.path.join(log_path, "dqn_init_model"))
+
     model = A2C("MlpPolicy", env, verbose=1)
     model.save(os.path.join(log_path, "a2c_init_model"))
 
     model = PPO("MlpPolicy", env, verbose=1)
     model.save(os.path.join(log_path, "ppo_init_model"))
-    
-    
+
     env = ActionMasker(env, mask_fn)  # Wrap to enable masking
 
     # MaskablePPO behaves the same as SB3's PPO unless the env is wrapped
@@ -107,10 +107,12 @@ def model_init(args=param_parser.parse_args()):
     # retrieved and used when learning. Note that MaskablePPO does not accept
     # a new action_mask_fn kwarg, as it did in an earlier draft.
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)
-    model.save(os.path.join(log_path, "masked_ppo_init_model"))
+    model.save(os.path.join(log_path, "maskedPPO_init_model"))
+
+    print(log_path)
 
     model = MaskableDQN(MaskableDQNPolicy, env, verbose=1)
-    model.save(os.path.join(log_path, "masked_dqn_init_model"))
+    model.save(os.path.join(log_path, "maskedDQN_init_model"))
 
 
 if __name__ == "__main__":
