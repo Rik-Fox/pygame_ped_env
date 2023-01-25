@@ -53,6 +53,64 @@ from sb3_contrib.ppo_mask.policies import CnnPolicy, MlpPolicy, MultiInputPolicy
 from stable_baselines3.dqn.policies import QNetwork
 
 
+class MaskableQNetwork(QNetwork):
+    def __init__(
+        self,
+        observation_space: spaces.Space,
+        action_space: spaces.Space,
+        features_extractor: nn.Module,
+        features_dim: int,
+        net_arch: Optional[List[int]] = None,
+        activation_fn: Type[nn.Module] = nn.ReLU,
+        normalize_images: bool = True,
+    ):
+        super().__init__(
+            observation_space,
+            action_space,
+            features_extractor,
+            features_dim,
+            net_arch,
+            activation_fn,
+            normalize_images,
+        )
+
+    def _predict(
+        self, observation: th.Tensor, deterministic: bool = True, action_masks=None
+    ) -> th.Tensor:
+        # q_values = self(observation)
+        action_logits = self(observation)
+        distribution = self.action_dist.proba_distribution(action_logits=action_logits)
+
+        if action_masks is not None:
+            distribution.apply_masking(action_masks)
+        actions = distribution.get_actions(deterministic=deterministic)
+        # if action_masks is not None:
+        #     q_values = q_values[action_masks[0].astype(np.bool)] / sum(
+        #         q_values[action_masks[0].astype(np.bool)]
+        #     )
+        # Greedy action
+        action = actions.argmax(dim=1).reshape(-1)
+        return action
+        # return super()._predict(observation, deterministic)
+
+    # def forward(self, obs: th.Tensor) -> th.Tensor:
+    #     """
+    #     Predict the q-values.
+
+    #     :param obs: Observation
+    #     :return: The estimated Q-Value for each action.
+    #     """
+    #     action_logits = self(obs)
+    #     distribution = self.action_dist.proba_distribution(action_logits=action_logits)
+
+    #     if action_masks is not None:
+    #         distribution.apply_masking(action_masks)
+    #     actions = distribution.get_actions(deterministic=deterministic)
+    #     log_prob = distribution.log_prob(actions)
+    #     return actions, log_prob
+    #     return self.q_net(self.extract_features(obs, self.features_extractor))
+
+
 class MaskableDQNPolicy(BasePolicy):
     def __init__(
         self,
@@ -126,7 +184,7 @@ class MaskableDQNPolicy(BasePolicy):
         net_args = self._update_features_extractor(
             self.net_args, features_extractor=None
         )
-        return QNetwork(**net_args).to(self.device)
+        return MaskableQNetwork(**net_args).to(self.device)
 
     def forward(
         self,
@@ -162,8 +220,70 @@ class MaskableDQNPolicy(BasePolicy):
         log_prob = distribution.log_prob(actions)
         return actions, log_prob
 
-    def _predict(self, obs: th.Tensor, deterministic: bool = True) -> th.Tensor:
-        return self.q_net._predict(obs, deterministic=deterministic)
+    def predict(
+        self,
+        observation: Union[np.ndarray, Dict[str, np.ndarray]],
+        state: Optional[Tuple[np.ndarray, ...]] = None,
+        episode_start: Optional[np.ndarray] = None,
+        deterministic: bool = False,
+        action_masks: Optional[np.ndarray] = None,
+    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        """
+        Get the policy action from an observation (and optional hidden state).
+        Includes sugar-coating to handle different observations (e.g. normalizing images).
+
+        :param observation: the input observation
+        :param state: The last states (can be None, used in recurrent policies)
+        :param episode_start: The last masks (can be None, used in recurrent policies)
+        :param deterministic: Whether or not to return deterministic actions.
+        :param action_masks: Action masks to apply to the action distribution
+        :return: the model's action and the next state
+            (used in recurrent policies)
+        """
+        # TODO (GH/1): add support for RNN policies
+        # if state is None:
+        #     state = self.initial_state
+        # if episode_start is None:
+        #     episode_start = [False for _ in range(self.n_envs)]
+
+        # Switch to eval mode (this affects batch norm / dropout)
+        self.set_training_mode(False)
+
+        observation, vectorized_env = self.obs_to_tensor(observation)
+
+        with th.no_grad():
+            actions = self._predict(
+                observation, deterministic=deterministic, action_masks=action_masks
+            )
+            # Convert to numpy
+            actions = actions.cpu().numpy()
+
+        if isinstance(self.action_space, spaces.Box):
+            if self.squash_output:
+                # Rescale to proper domain when using squashing
+                actions = self.unscale_action(actions)
+            else:
+                # Actions could be on arbitrary scale, so clip the actions to avoid
+                # out of bound error (e.g. if sampling from a Gaussian distribution)
+                actions = np.clip(
+                    actions, self.action_space.low, self.action_space.high
+                )
+
+        if not vectorized_env:
+            if state is not None:
+                raise ValueError(
+                    "Error: The environment must be vectorized when using recurrent policies."
+                )
+            actions = actions.squeeze(axis=0)
+
+        return actions, None
+
+    def _predict(
+        self, obs: th.Tensor, deterministic: bool = True, action_masks=None
+    ) -> th.Tensor:
+        return self.q_net._predict(
+            obs, deterministic=deterministic, action_masks=action_masks
+        )
         # actions, probs = self.forward(obs, deterministic=deterministic)
 
     def _get_constructor_parameters(self) -> Dict[str, Any]:
@@ -889,9 +1009,16 @@ class MaskableDQN(OffPolicyAlgorithm):
             self.use_sde and self.use_sde_at_warmup
         ):
             # Warmup phase
-            valid_actions = 
+            if not action_masks.dtype == np.bool:
+                action_masks = action_masks.astype(np.bool)
+
+            actions = np.array([*range(self.action_space.n)])
+
+            self.action_dist.sample()
+
+            # valid_actions =
             unscaled_action = np.array(
-                [self.action_space[action_masks].sample() for _ in range(n_envs)]
+                [np.random.choice(actions[action_masks[n]]) for n in range(n_envs)]
             )
         else:
             # Note: when using continuous actions,

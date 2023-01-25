@@ -58,6 +58,8 @@ def model_init(args=param_parser.parse_args()):
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
 
+    # args.shaped_agent = True
+
     ### IMPORTANT ###
     # must use correct scenario set otherwise will be updated for rewards
     # recieved by other models actions; these varibles switch to the shaped model
@@ -109,9 +111,33 @@ def model_init(args=param_parser.parse_args()):
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)
     model.save(os.path.join(log_path, "maskedPPO_init_model"))
 
-    print(log_path)
-
-    model = MaskableDQN(MaskableDQNPolicy, env, verbose=1)
+    model = MaskableDQN(
+        MaskableDQNPolicy,
+        env,
+        learning_rate=1e-4,
+        buffer_size=1_000_000,  # 1e6
+        # learning_starts=50000,
+        learning_starts=0,
+        batch_size=1024,
+        tau=1.0,
+        gamma=0.99,
+        train_freq=64,
+        gradient_steps=1,
+        replay_buffer_class=None,
+        replay_buffer_kwargs=None,
+        optimize_memory_usage=False,
+        target_update_interval=10000,
+        exploration_fraction=0.1,
+        exploration_initial_eps=1.0,
+        exploration_final_eps=0.05,
+        max_grad_norm=10,
+        tensorboard_log=None,
+        policy_kwargs=None,
+        verbose=1,
+        seed=1234,
+        device="auto",
+        _init_setup_model=True,
+    )
     model.save(os.path.join(log_path, "maskedDQN_init_model"))
 
 
