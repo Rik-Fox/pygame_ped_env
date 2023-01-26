@@ -114,7 +114,7 @@ class RLCrossingSim(gym.Env):
         self.num_steps = 0
 
     def action_masks(self):
-        mask = np.ones(self.action_space.n)
+        mask = np.ones(self.action_space.n).astype(bool)
         for action in range(self.action_space.n):
             mapped_action = (
                 self.vehicle.sprite.action_map[action % 8]

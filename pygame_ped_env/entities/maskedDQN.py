@@ -1,4 +1,4 @@
-import sys
+import os
 import time
 from collections import deque
 import warnings
@@ -74,6 +74,8 @@ class MaskableQNetwork(QNetwork):
             normalize_images,
         )
 
+        self.action_dist = make_masked_proba_distribution(action_space)
+
     def _predict(
         self, observation: th.Tensor, deterministic: bool = True, action_masks=None
     ) -> th.Tensor:
@@ -84,31 +86,9 @@ class MaskableQNetwork(QNetwork):
         if action_masks is not None:
             distribution.apply_masking(action_masks)
         actions = distribution.get_actions(deterministic=deterministic)
-        # if action_masks is not None:
-        #     q_values = q_values[action_masks[0].astype(np.bool)] / sum(
-        #         q_values[action_masks[0].astype(np.bool)]
-        #     )
-        # Greedy action
-        action = actions.argmax(dim=1).reshape(-1)
-        return action
+
+        return actions
         # return super()._predict(observation, deterministic)
-
-    # def forward(self, obs: th.Tensor) -> th.Tensor:
-    #     """
-    #     Predict the q-values.
-
-    #     :param obs: Observation
-    #     :return: The estimated Q-Value for each action.
-    #     """
-    #     action_logits = self(obs)
-    #     distribution = self.action_dist.proba_distribution(action_logits=action_logits)
-
-    #     if action_masks is not None:
-    #         distribution.apply_masking(action_masks)
-    #     actions = distribution.get_actions(deterministic=deterministic)
-    #     log_prob = distribution.log_prob(actions)
-    #     return actions, log_prob
-    #     return self.q_net(self.extract_features(obs, self.features_extractor))
 
 
 class MaskableDQNPolicy(BasePolicy):
@@ -497,7 +477,6 @@ class MaskableDQN(OffPolicyAlgorithm):
     def _init_callback(
         self,
         callback: MaybeCallback,
-        use_masking: bool = True,
         progress_bar: bool = False,
     ) -> BaseCallback:
         """
@@ -530,8 +509,7 @@ class MaskableDQN(OffPolicyAlgorithm):
         total_timesteps: int,
         callback: MaybeCallback = None,
         reset_num_timesteps: bool = True,
-        tb_log_name: str = "run",
-        use_masking: bool = True,
+        tb_log_name: str = "./run",
         progress_bar: bool = False,
     ) -> Tuple[int, BaseCallback]:
         # Prevent continuity issue by truncating trajectory
@@ -603,12 +581,13 @@ class MaskableDQN(OffPolicyAlgorithm):
 
         # Configure logger's outputs if no logger was passed
         if not self._custom_logger:
+            # self.tensorboard_log, tb_log_name = os.path.split(tb_log_name)
             self._logger = utils.configure_logger(
                 self.verbose, self.tensorboard_log, tb_log_name, reset_num_timesteps
             )
 
         # Create eval callback if needed
-        callback = self._init_callback(callback, use_masking, progress_bar)
+        callback = self._init_callback(callback, progress_bar)
 
         return total_timesteps, callback
 
@@ -643,9 +622,6 @@ class MaskableDQN(OffPolicyAlgorithm):
         :return:
         """
 
-        # assert isinstance(
-        #     rollout_buffer, (MaskableRolloutBuffer, MaskableDictRolloutBuffer)
-        # ), "RolloutBuffer doesn't support action masking"
         assert self._last_obs is not None, "No previous observation was provided"
         # Switch to eval mode (this affects batch norm / dropout)
         self.policy.set_training_mode(False)
@@ -693,12 +669,6 @@ class MaskableDQN(OffPolicyAlgorithm):
             # This is the only change related to invalid action masking
             if use_masking:
                 action_masks = get_action_masks(env)
-
-            with th.no_grad():
-                # Convert to pytorch tensor or to TensorDict
-                obs_tensor = utils.obs_as_tensor(self._last_obs, self.device)
-
-            actions, log_probs = self.policy(obs_tensor, action_masks=action_masks)
 
             # Select action randomly or according to policy
             actions, buffer_actions = self._sample_action(
@@ -781,7 +751,16 @@ class MaskableDQN(OffPolicyAlgorithm):
         :return: the model's action and the next state
             (used in recurrent policies)
         """
+
         if not deterministic and np.random.rand() < self.exploration_rate:
+
+            if not action_masks.dtype == np.bool:
+                action_masks = action_masks.astype(np.bool)
+
+            actions = np.array([*range(self.action_space.n)])
+
+            # self.action_dist.sample()
+
             if utils.is_vectorized_observation(
                 maybe_transpose(observation, self.observation_space),
                 self.observation_space,
@@ -790,9 +769,11 @@ class MaskableDQN(OffPolicyAlgorithm):
                     n_batch = observation[list(observation.keys())[0]].shape[0]
                 else:
                     n_batch = observation.shape[0]
-                action = np.array([self.action_space.sample() for _ in range(n_batch)])
+                action = np.array(
+                    [np.random.choice(actions[action_masks[n]]) for n in range(n_batch)]
+                )
             else:
-                action = np.array(self.action_space.sample())
+                action = np.array(np.random.choice(actions[action_masks[0]]))
         else:
 
             action, state = self.policy.predict(
@@ -875,57 +856,6 @@ class MaskableDQN(OffPolicyAlgorithm):
         )
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
-    def train(self, gradient_steps: int, batch_size: int = 100) -> None:
-        # Switch to train mode (this affects batch norm / dropout)
-        self.policy.set_training_mode(True)
-        # Update learning rate according to schedule
-        self._update_learning_rate(self.policy.optimizer)
-
-        losses = []
-        for _ in range(gradient_steps):
-            # Sample replay buffer
-            replay_data = self.replay_buffer.sample(
-                batch_size, env=self._vec_normalize_env
-            )
-
-            with th.no_grad():
-                # Compute the next Q-values using the target network
-                next_q_values = self.q_net_target(replay_data.next_observations)
-                # Follow greedy policy: use the one with the highest value
-                next_q_values, _ = next_q_values.max(dim=1)
-                # Avoid potential broadcast issue
-                next_q_values = next_q_values.reshape(-1, 1)
-                # 1-step TD target
-                target_q_values = (
-                    replay_data.rewards
-                    + (1 - replay_data.dones) * self.gamma * next_q_values
-                )
-
-            # Get current Q-values estimates
-            current_q_values = self.q_net(replay_data.observations)
-
-            # Retrieve the q-values for the actions from the replay buffer
-            current_q_values = th.gather(
-                current_q_values, dim=1, index=replay_data.actions.long()
-            )
-
-            # Compute Huber loss (less sensitive to outliers)
-            loss = F.smooth_l1_loss(current_q_values, target_q_values)
-            losses.append(loss.item())
-
-            # Optimize the policy
-            self.policy.optimizer.zero_grad()
-            loss.backward()
-            # Clip gradient norm
-            th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-            self.policy.optimizer.step()
-
-        # Increase update counter
-        self._n_updates += gradient_steps
-
-        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train/loss", np.mean(losses))
-
     def learn(
         self: SelfMaskableDQN,
         total_timesteps: int,
@@ -942,7 +872,6 @@ class MaskableDQN(OffPolicyAlgorithm):
             callback,
             reset_num_timesteps,
             tb_log_name,
-            use_masking,
             progress_bar,
         )
 
@@ -1014,7 +943,7 @@ class MaskableDQN(OffPolicyAlgorithm):
 
             actions = np.array([*range(self.action_space.n)])
 
-            self.action_dist.sample()
+            # self.action_dist.sample()
 
             # valid_actions =
             unscaled_action = np.array(

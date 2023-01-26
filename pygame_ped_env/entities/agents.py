@@ -15,10 +15,10 @@ class RLVehicle(Vehicle):
     ) -> None:
 
         if direction == "right":
-            start = [0 + 500, window_size[1] / 2]
+            start = [0, window_size[1] / 2]
             end = [window_size[0], window_size[1] / 2]
         elif direction == "left":
-            start = [window_size[0] - 500, window_size[1] / 2]
+            start = [window_size[0], window_size[1] / 2]
             end = [0, window_size[1] / 2]
         else:
             raise AttributeError(
@@ -27,9 +27,9 @@ class RLVehicle(Vehicle):
 
         super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
         if direction == "right":
-            self.rect.centerx + np.array(self.rect.size[0])
+            self.rect.midleft += np.array(self.rect.size[0])
         elif direction == "left":
-            self.rect.centerx - np.array(self.rect.size[0])
+            self.rect.midright -= np.array(self.rect.size[0])
         start = self.rect.center
         # ensure goal is centred in lane after car sprite position is adjusted in super
         end[1] = start[1]

@@ -5,13 +5,14 @@ import numpy as np
 from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
 from sb3_contrib.common.wrappers import ActionMasker
+from sb3_contrib.common.maskable.utils import get_action_masks
 
 
 def mask_fn(env: gym.Env) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
     # for the current env. In this example, we assume the env has a
     # helpful method we can rely on.
-    return env.valid_action_mask()
+    return env.action_masks()
 
 
 def Eval(args=param_parser.parse_args()):
@@ -23,7 +24,7 @@ def Eval(args=param_parser.parse_args()):
 
     if args.basic_model is None:
         args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "init_model"
+            args.log_path, "simple_reward_agent", "maskedDQN_init_model"
         )
 
     if args.eval_basic_model is None:
@@ -31,7 +32,7 @@ def Eval(args=param_parser.parse_args()):
 
     if args.attr_model is None:
         args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "init_model"
+            args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
         )
 
     if args.eval_attr_model is None:
@@ -83,7 +84,10 @@ def Eval(args=param_parser.parse_args()):
             if env.scenarioName in ("H2", "H_l", "H_r"):
                 obs, reward, done, info = env.step({"obs": obs})
             else:
-                obs, reward, done, info = env.step(env.modelL.predict(obs))
+                obs, reward, done, info = env.step(
+                    env.modelL.predict(obs, action_masks=get_action_masks(env))
+                )
+
         print(info)
 
 

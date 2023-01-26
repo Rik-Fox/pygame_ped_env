@@ -154,7 +154,8 @@ def Main(args=param_parser.parse_args()):
         total_timesteps=(450 * args.n_episodes),
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
-        log_interval=args.log_interval,
+        log_interval=args.log_interval / 10,
+        # log_interval=10,
     )
 
     env.envs[0].modelL.save(os.path.join(log_path, "final_model"), include="env")
