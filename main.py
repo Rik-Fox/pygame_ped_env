@@ -28,9 +28,6 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 def Main(args=param_parser.parse_args()):
 
-    args.shaped_agent = True
-    args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_init_model.zip"
-    args.scenarioList = [0, 1]
     ### IMPORTANT ###
     # must use correct scenario set otherwise will be updated for rewards
     # recieved by other models actions; these varibles switch to the shaped model
@@ -38,10 +35,6 @@ def Main(args=param_parser.parse_args()):
     if args.shaped_agent:
         # attribute based reward agent
         args.model_name = "shaped_reward_agent"
-
-    args.basic_model = os.path.join(
-        args.log_path, "simple_reward_agent", "maskedPPO_init_model"
-    )
 
     log_path = os.path.join(
         args.log_path,
@@ -172,7 +165,7 @@ if __name__ == "__main__":
 
     if args.basic_model is None:
         args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "dqn_init_model"
+            args.log_path, "simple_reward_agent", "maskedDQN_init_model"
         )
 
     if args.eval_basic_model is None:
@@ -180,7 +173,7 @@ if __name__ == "__main__":
 
     if args.attr_model is None:
         args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "dqn_init_model"
+            args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
         )
 
     if args.eval_attr_model is None:
@@ -188,24 +181,13 @@ if __name__ == "__main__":
 
     if args.scenarioList is None:
         if args.shaped_agent:
-            args.scenarioList = [*range(0, 8)]
-            args.eval_scenarioList = [*range(0, 8)]
+            args.scenarioList = [0, 1]
+            args.eval_scenarioList = [0, 1]
         else:
-            args.scenarioList = [*range(8, 16)]
-            args.eval_scenarioList = [*range(8, 16)]
+            args.scenarioList = [8, 9]
+            args.eval_scenarioList = [8, 9]
     else:
         args.scenarioList = [int(i) for i in args.scenarioList]
         args.eval_scenarioList = args.scenarioList
-
-    args.shaped_agent = True
-    args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/env_eval_logs/masked_dqn_init_model"
-    args.scenarioList = [0, 1]
-    ### IMPORTANT ###
-    # must use correct scenario set otherwise will be updated for rewards
-    # recieved by other models actions; these varibles switch to the shaped model
-    # and all it's appropriate scenarios etc to train with only a boolean flag
-    if args.shaped_agent:
-        # attribute based reward agent
-        args.model_name = "shaped_reward_agent"
 
     Main(args=args)
