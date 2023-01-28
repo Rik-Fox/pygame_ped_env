@@ -131,7 +131,7 @@ class RLCrossingSim(gym.Env):
     def get_max_reward(self, shaped_reward=True):
         # highest possible reward for both cases
         if not shaped_reward:
-            return (0.03 * (self.screen_rect.w / 3)) * 2
+            return (2 * (self.screen_rect.w / 3)) * 2
         else:
             return (
                 np.sum(np.array(range(0, self.screen_rect.w, 3)) / self.screen_rect.w)
@@ -250,9 +250,9 @@ class RLCrossingSim(gym.Env):
             self.info["done_cause"] = "hit_pedestrian"
             return -np.infty, True
 
-        on_road = 0.01
+        on_road = 1
         if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
-            on_road = -0.01
+            on_road = -1
 
         curr_d_obj = agent.sprite.dist_to_objective()
         # if we have reached the destination, give max rwd
@@ -262,7 +262,7 @@ class RLCrossingSim(gym.Env):
             self.info["done_cause"] = "objective_reached"
             done = True
         else:
-            rwd = -0.04 + on_road
+            rwd = -4 + on_road
 
         return rwd, done
 
@@ -294,7 +294,7 @@ class RLCrossingSim(gym.Env):
         else:
             position_rwd = -np.linalg.norm(
                 dist_to_obj, ord=1
-            )  # ord=1 is manhattan distance
+            ) / self.screen_rect.w # ord=1 is manhattan distance
 
         # movement vector magnitude for this action
         delta_rho_1 = np.hypot(agent.sprite.moved[-1][0], agent.sprite.moved[-1][1])

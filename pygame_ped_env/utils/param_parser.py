@@ -34,7 +34,7 @@ param_parser.add_argument("--render", default=False, action="store_true")
 param_parser.add_argument("--verbose", type=int, default=1)
 
 # scenario params
-param_parser.add_argument("--scenarioList", type=list, default=[*range(8, 16)])
+param_parser.add_argument("--scenarioList", type=list, default=None)
 param_parser.add_argument("--sim_area", type=tuple, default=(1280, 720))
 # must be False in training
 param_parser.add_argument("--human_controlled_ped", default=False, action="store_true")
