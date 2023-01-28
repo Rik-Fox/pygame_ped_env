@@ -130,8 +130,10 @@ class RLCrossingSim(gym.Env):
 
     def get_max_reward(self, shaped_reward=True):
         # highest possible reward for both cases
+        # returned as +ve value to make
+        # reward for perfect performance = 0
         if not shaped_reward:
-            return (2 * (self.screen_rect.w / 3)) * 2
+            return 3 * (self.screen_rect.w / 3)
         else:
             return np.sum(
                 np.array(range(0, self.screen_rect.w, 3)) / self.screen_rect.w
@@ -254,7 +256,7 @@ class RLCrossingSim(gym.Env):
             on_road = -1
 
         # if we have reached the destination, give max rwd
-        if agent.sprite.rect.colliderect(
+        if agent.sprite.rect.collidepoint(
             pygame.Rect([agent.sprite.objective, (0, 0)]).center
         ):
             # rwd for hitting goal
@@ -285,7 +287,7 @@ class RLCrossingSim(gym.Env):
             # self.info["done_cause"] = "off_road"
 
         # if we have reached the destination, give max rwd
-        if agent.sprite.rect.colliderect(
+        if agent.sprite.rect.collidepoint(
             pygame.Rect([agent.sprite.objective, (0, 0)]).center
         ):
             # rwd for hitting goal

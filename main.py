@@ -105,7 +105,7 @@ def Main(args=param_parser.parse_args()):
         monitor_dir=eval_monitor_path,
     )
 
-    model_name = args.exp_log_path.split(os.sep)[-1].split("_")[0]
+    model_name = args.exp_log_name.split(os.sep)[-1].split("_")[0]
 
     callbacks = clbks.CallbackList(
         [
@@ -130,10 +130,11 @@ def Main(args=param_parser.parse_args()):
                     verbose=args.eval_verbose,
                 ),
                 callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
-                    reward_threshold=(
-                        eval_env.envs[0].get_max_reward(args.shaped_agent) / 2
-                    )
-                    * 0.98
+                    reward_threshold=0
+                    # reward_threshold=(
+                    #     eval_env.envs[0].get_max_reward(args.shaped_agent) / 2
+                    # )
+                    # * 0.98
                 ),
                 n_eval_episodes=args.eval_episodes,
                 eval_freq=args.eval_interval,
