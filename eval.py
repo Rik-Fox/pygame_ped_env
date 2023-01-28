@@ -31,9 +31,10 @@ def Eval(args=param_parser.parse_args()):
         args.eval_basic_model = args.basic_model
 
     if args.attr_model is None:
-        args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
-        )
+        # args.attr_model = os.path.join(
+        #     args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
+        # )
+        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/mask_test_logs/checkpoints/maskedDQN_at_46000000_steps.zip"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model

@@ -133,9 +133,8 @@ class RLCrossingSim(gym.Env):
         if not shaped_reward:
             return (2 * (self.screen_rect.w / 3)) * 2
         else:
-            return (
-                np.sum(np.array(range(0, self.screen_rect.w, 3)) / self.screen_rect.w)
-                * 2
+            return np.sum(
+                np.array(range(0, self.screen_rect.w, 3)) / self.screen_rect.w
             )
 
     def generateBackground(self):
@@ -254,9 +253,10 @@ class RLCrossingSim(gym.Env):
         if not pygame.sprite.spritecollide(agent.sprite, self.roads, False):
             on_road = -1
 
-        curr_d_obj = agent.sprite.dist_to_objective()
         # if we have reached the destination, give max rwd
-        if (curr_d_obj == np.zeros(2)).all():
+        if agent.sprite.rect.colliderect(
+            pygame.Rect([agent.sprite.objective, (0, 0)]).center
+        ):
             # rwd for hitting goal
             rwd = self.get_max_reward(self.simple_reward)
             self.info["done_cause"] = "objective_reached"
@@ -282,19 +282,21 @@ class RLCrossingSim(gym.Env):
             collide_rwd = -1
             # elif not pygame.sprite.spritecollide(agent.sprite, self.roads.lane, False):
             # collide_rwd = -0.5
+            # self.info["done_cause"] = "off_road"
 
-        # distance from end point
-        dist_to_obj = agent.sprite.dist_to_objective()
         # if we have reached the destination, give max rwd
-        if (dist_to_obj == np.zeros(2)).all():
+        if agent.sprite.rect.colliderect(
+            pygame.Rect([agent.sprite.objective, (0, 0)]).center
+        ):
             # rwd for hitting goal
             position_rwd = self.get_max_reward(self.simple_reward)
             self.info["done_cause"] = "objective_reached"
             done = True
         else:
-            position_rwd = -np.linalg.norm(
-                dist_to_obj, ord=1
-            ) / self.screen_rect.w # ord=1 is manhattan distance
+            position_rwd = (
+                -np.linalg.norm(agent.sprite.dist_to_objective(), ord=1)
+                / self.screen_rect.w
+            )  # ord=1 is manhattan distance
 
         # movement vector magnitude for this action
         delta_rho_1 = np.hypot(agent.sprite.moved[-1][0], agent.sprite.moved[-1][1])

@@ -769,11 +769,18 @@ class MaskableDQN(OffPolicyAlgorithm):
                     n_batch = observation[list(observation.keys())[0]].shape[0]
                 else:
                     n_batch = observation.shape[0]
-                action = np.array(
-                    [np.random.choice(actions[action_masks[n]]) for n in range(n_batch)]
-                )
+                # catch case for Vec env wrapper with only 1 env
+                if actions.shape == action_masks.shape:
+                    action = np.array([np.random.choice(actions[action_masks])])
+                else:
+                    action = np.array(
+                        [
+                            np.random.choice(actions[action_masks[n]])
+                            for n in range(n_batch)
+                        ]
+                    )
             else:
-                action = np.array(np.random.choice(actions[action_masks[0]]))
+                action = np.array([np.random.choice(actions[action_masks])])
         else:
 
             action, state = self.policy.predict(

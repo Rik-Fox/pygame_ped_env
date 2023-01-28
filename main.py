@@ -105,6 +105,8 @@ def Main(args=param_parser.parse_args()):
         monitor_dir=eval_monitor_path,
     )
 
+    model_name = args.exp_log_path.split(os.sep)[-1].split("_")[0]
+
     callbacks = clbks.CallbackList(
         [
             clbks.EveryNTimesteps(
@@ -116,7 +118,7 @@ def Main(args=param_parser.parse_args()):
             clbks.CheckpointCallback(
                 args.checkpoint_interval,
                 os.path.join(log_path, args.checkpoint_dirname),
-                name_prefix=args.checkpoint_filename_prefix,
+                name_prefix=f"{model_name}_at",
                 verbose=args.verbose,
             ),
             clbks.StopTrainingOnMaxEpisodes(args.n_episodes, verbose=args.verbose),
