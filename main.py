@@ -2,6 +2,7 @@ import os
 import gym
 import numpy as np
 
+from stable_baselines3.common import utils
 from stable_baselines3.common.env_util import make_vec_env
 import stable_baselines3.common.callbacks as clbks
 from sb3_contrib.common.wrappers import ActionMasker
@@ -139,15 +140,21 @@ def Main(args=param_parser.parse_args()):
                 n_eval_episodes=args.eval_episodes,
                 eval_freq=args.eval_interval,
                 log_path=log_path,
-                best_model_save_path=os.path.join(eval_log_path, "best"),
+                best_model_save_path=os.path.join(eval_log_path, f"{model_name}_best"),
                 render=args.eval_render,
                 verbose=args.eval_verbose,
             ),
         ],
     )
 
+    env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
+        args.exploration_initial_eps,
+        args.exploration_final_eps,
+        args.exploration_fraction,
+    )
+
     env.envs[0].modelL.learn(
-        total_timesteps=(450 * args.n_episodes),
+        total_timesteps=(1000 * args.n_episodes),
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
         log_interval=args.log_interval / 10,

@@ -23,9 +23,10 @@ def Eval(args=param_parser.parse_args()):
         args.log_path = os.path.join(wkdir, "logs")
 
     if args.basic_model is None:
-        args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "maskedDQN_init_model"
-        )
+        # args.basic_model = os.path.join(
+        #     args.log_path, "simple_reward_agent", "maskedDQN_init_model"
+        # )
+        args.basic_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/simple_reward_agent/maskedDQN_best_model.zip"
 
     if args.eval_basic_model is None:
         args.eval_basic_model = args.basic_model
@@ -34,7 +35,7 @@ def Eval(args=param_parser.parse_args()):
         # args.attr_model = os.path.join(
         #     args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
         # )
-        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/mask_test_logs/checkpoints/maskedDQN_at_46000000_steps.zip"
+        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_best_model.zip"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
@@ -55,7 +56,7 @@ def Eval(args=param_parser.parse_args()):
     )
     os.makedirs(log_path, exist_ok=True)
 
-    scenarios = [0, 1]
+    scenarios = [0, 1, 8, 9]
 
     env = RLCrossingSim(
         sim_area=args.sim_area,

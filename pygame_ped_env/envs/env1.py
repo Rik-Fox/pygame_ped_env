@@ -61,13 +61,18 @@ class RLCrossingSim(gym.Env):
         # this varible structure allows for sim_area =/= screen_rect so events on edges
         # and spawn are not displayed as all display updates use screen_rect
         self.screen_rect = pygame.Rect((0, 0), sim_area)
+        assert (
+            self.screen_rect.w <= 1280
+        ), "simulation must be less than 1280 pixels wide"
+        assert self.screen_rect.h <= 720, "simulation must be less than 720 pixels high"
         assert self.screen_rect.w > self.screen_rect.h, "simulation must be portrait"
 
         # 150 is offscreen pixel buffer,
         # TODO: should be associated to agent sprite rect programatically
-        self.observation_space = gym.spaces.Box(
-            low=-150, high=self.screen_rect.w + 150, shape=(14,)
-        )
+        # self.observation_space = gym.spaces.Box(
+        #     low=-150, high=self.screen_rect.w + 150, shape=(14,)
+        # )
+        self.observation_space = gym.spaces.Box(low=-150, high=1280 + 150, shape=(14,))
 
         # (8 directions * 3 speeds) + 1 no_op action
         self.action_space = gym.spaces.Discrete(25)
@@ -224,6 +229,7 @@ class RLCrossingSim(gym.Env):
             rwd = 0.0
         elif self.simple_reward:
             rwd, done = self.get_simple_reward(agent)
+            # rwd += 4
         else:
             # function for social rewards
             # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
@@ -237,6 +243,13 @@ class RLCrossingSim(gym.Env):
                 + (np.power(h_rwd, self.steer_coeff) - 1)
                 + c_rwd
             )
+
+            # rwd = (
+            #     (np.power(p_rwd, self.pos_coeff))
+            #     + (np.power(s_rwd, self.speed_coeff))
+            #     + (np.power(h_rwd, self.steer_coeff))
+            #     + c_rwd
+            # )
 
         return rwd, done
 
@@ -261,6 +274,8 @@ class RLCrossingSim(gym.Env):
         ):
             # rwd for hitting goal
             rwd = self.get_max_reward(self.simple_reward)
+            print("goal reached")
+            print(rwd)
             self.info["done_cause"] = "objective_reached"
             done = True
         else:
@@ -694,10 +709,12 @@ class RLCrossingSim(gym.Env):
             alg = A2C
         elif name == "maskedDQN":
             alg = MaskableDQN
+        elif name == "train":
+            alg = MaskableDQN
         elif name == "maskedPPO":
             alg = MaskablePPO
         else:
-            raise ValueError("Unknown model type: " + name)
+            raise ValueError("Unknown model type: ", name)
 
         try:
             return alg.load(path, env=self)

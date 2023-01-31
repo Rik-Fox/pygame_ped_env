@@ -94,13 +94,13 @@ def model_init(args=param_parser.parse_args()):
     )
 
     model = DQN("MlpPolicy", env, verbose=1)
-    model.save(os.path.join(log_path, "dqn_init_model"))
+    model.save(os.path.join(log_path, f"dqn_init_model_{args.sim_area[1]}"))
 
     model = A2C("MlpPolicy", env, verbose=1)
-    model.save(os.path.join(log_path, "a2c_init_model"))
+    model.save(os.path.join(log_path, f"a2c_init_model_{args.sim_area[1]}"))
 
     model = PPO("MlpPolicy", env, verbose=1)
-    model.save(os.path.join(log_path, "ppo_init_model"))
+    model.save(os.path.join(log_path, f"ppo_init_model_{args.sim_area[1]}"))
 
     env = ActionMasker(env, mask_fn)  # Wrap to enable masking
 
@@ -109,7 +109,7 @@ def model_init(args=param_parser.parse_args()):
     # retrieved and used when learning. Note that MaskablePPO does not accept
     # a new action_mask_fn kwarg, as it did in an earlier draft.
     model = MaskablePPO(MaskableActorCriticPolicy, env, verbose=1)
-    model.save(os.path.join(log_path, "maskedPPO_init_model"))
+    model.save(os.path.join(log_path, f"maskedPPO_init_model_{args.sim_area[1]}"))
 
     model = MaskableDQN(
         MaskableDQNPolicy,
@@ -137,7 +137,7 @@ def model_init(args=param_parser.parse_args()):
         device="auto",
         _init_setup_model=True,
     )
-    model.save(os.path.join(log_path, "maskedDQN_init_model"))
+    model.save(os.path.join(log_path, f"maskedDQN_init_model_{args.sim_area[1]}"))
 
 
 if __name__ == "__main__":

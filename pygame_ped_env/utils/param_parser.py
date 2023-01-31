@@ -1,5 +1,13 @@
 import argparse
 
+
+def str_2_int(s):
+    # import pdb
+
+    # pdb.set_trace()
+    return int(s)
+
+
 # argument parser
 param_parser = argparse.ArgumentParser(description="RLCrossingSim")
 
@@ -34,8 +42,8 @@ param_parser.add_argument("--render", default=False, action="store_true")
 param_parser.add_argument("--verbose", type=int, default=1)
 
 # scenario params
-param_parser.add_argument("--scenarioList", type=list, default=None)
-param_parser.add_argument("--sim_area", type=tuple, default=(1280, 720))
+param_parser.add_argument("--scenarioList", nargs="+", type=int, default=None)
+param_parser.add_argument("--sim_area", nargs=2, type=int, default=[640, 480])
 # must be False in training
 param_parser.add_argument("--human_controlled_ped", default=False, action="store_true")
 # must be False if headless : True
@@ -67,8 +75,8 @@ param_parser.add_argument(
 param_parser.add_argument(
     "--eval_human_controlled_car", default=False, action="store_true"
 )
-param_parser.add_argument("--eval_scenarioList", type=list, default=None)
-param_parser.add_argument("--eval_sim_area", type=tuple, default=(1280, 720))
+param_parser.add_argument("--eval_scenarioList", nargs="+", type=int, default=None)
+param_parser.add_argument("--eval_sim_area", nargs=2, type=int, default=[640, 480])
 param_parser.add_argument("--eval_speed_coefficient", type=float, default=1.0)
 param_parser.add_argument("--eval_position_coefficient", type=float, default=1.0)
 param_parser.add_argument("--eval_steering_coefficient", type=float, default=1.0)
@@ -83,3 +91,10 @@ param_parser.add_argument("--eval_log_name", type=str, default="eval_logs")
 #     type=str,
 #     default="monitor_files",
 # )
+
+# exploration_initial_eps,
+param_parser.add_argument("--exploration_initial_eps", type=float, default=1.0)
+param_parser.add_argument("--exploration_fraction", type=float, default=0.1)
+param_parser.add_argument("--exploration_final_eps", type=float, default=0.01)
+#         exploration_final_eps,
+#         exploration_fraction,
