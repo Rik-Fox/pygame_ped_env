@@ -98,3 +98,11 @@ param_parser.add_argument("--exploration_fraction", type=float, default=0.1)
 param_parser.add_argument("--exploration_final_eps", type=float, default=0.01)
 #         exploration_final_eps,
 #         exploration_fraction,
+
+
+param_parser.add_argument(
+    "--cont",
+    default=False,
+    action="store_true",
+    help="if True, continue training agent from load state, else start new training epoch",
+)

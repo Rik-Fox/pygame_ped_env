@@ -146,18 +146,59 @@ def Main(args=param_parser.parse_args()):
             ),
         ],
     )
+    # for i in range(args.n_envs):
+    #     env.envs[i].modelL.set_env(env.envs[i])
 
-    env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
-        args.exploration_initial_eps,
-        args.exploration_final_eps,
-        args.exploration_fraction,
-    )
+    args.cont = True
+    args.shaped_agent = True
+
+    if args.cont:
+        if args.shaped_agent:
+            loaded_model = env.envs[0].modelA
+        else:
+            loaded_model = env.envs[0].modelB
+
+        env.envs[0].modelL._episode_num = loaded_model._episode_num
+        env.envs[0].modelL._n_calls = loaded_model._n_calls
+        env.envs[0].modelL._n_updates = loaded_model._n_updates
+        env.envs[0].modelL.num_timesteps = loaded_model.num_timesteps
+        env.envs[0].modelL.replay_buffer = loaded_model.replay_buffer
+        env.envs[0].modelL.learning_starts = 0
+        # env.envs[0].modelL.load_replay_buffer(loaded_model.replay_buffer)
+        env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
+            loaded_model.exploration_rate,
+            loaded_model.exploration_final_eps,
+            np.clip(
+                (
+                    loaded_model._current_progress_remaining
+                    - (1 - loaded_model.exploration_fraction)
+                )
+                / loaded_model.exploration_fraction,
+                0,
+                1,
+            ),
+        )
+        total_timesteps = loaded_model._total_timesteps - loaded_model.num_timesteps
+        # tb_log_name = loaded_model.tensorboard_log
+        # log_interval = loaded_model.log_interval
+        reset_num_timesteps = False
+    else:
+        env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
+            args.exploration_initial_eps,
+            args.exploration_final_eps,
+            args.exploration_fraction,
+        )
+        total_timesteps = 1000 * args.n_episodes
+        # tb_log_name = os.path.join(log_path, "tb_logs")
+        # log_interval = args.log_interval / 10
+        reset_num_timesteps = True
 
     env.envs[0].modelL.learn(
-        total_timesteps=(1000 * args.n_episodes),
+        total_timesteps=total_timesteps,
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
         log_interval=args.log_interval / 10,
+        reset_num_timesteps=reset_num_timesteps,
         # log_interval=10,
     )
 
@@ -174,17 +215,20 @@ if __name__ == "__main__":
         args.log_path = os.path.join(wkdir, "logs")
 
     if args.basic_model is None:
+        # args.basic_model = os.path.join(
+        #     args.log_path, "simple_reward_agent", "maskedDQN_init_model_480"
+        # )
         args.basic_model = os.path.join(
             args.log_path, "simple_reward_agent", "maskedDQN_init_model_480"
         )
-
     if args.eval_basic_model is None:
         args.eval_basic_model = args.basic_model
 
     if args.attr_model is None:
-        args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "maskedDQN_init_model_480"
-        )
+        # args.attr_model = os.path.join(
+        #     args.log_path, "shaped_reward_agent", "maskedDQN_init_model_480"
+        # )
+        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_train_neg/checkpoints/maskedDQN_at_48000000_steps"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
