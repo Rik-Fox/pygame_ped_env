@@ -149,9 +149,6 @@ def Main(args=param_parser.parse_args()):
     # for i in range(args.n_envs):
     #     env.envs[i].modelL.set_env(env.envs[i])
 
-    args.cont = True
-    args.shaped_agent = True
-
     if args.cont:
         if args.shaped_agent:
             loaded_model = env.envs[0].modelA
@@ -225,10 +222,10 @@ if __name__ == "__main__":
         args.eval_basic_model = args.basic_model
 
     if args.attr_model is None:
-        # args.attr_model = os.path.join(
-        #     args.log_path, "shaped_reward_agent", "maskedDQN_init_model_480"
-        # )
-        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_train_neg/checkpoints/maskedDQN_at_48000000_steps"
+        args.attr_model = os.path.join(
+            args.log_path, "shaped_reward_agent", "maskedDQN_init_model_480"
+        )
+        # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_train_neg/checkpoints/maskedDQN_at_48000000_steps"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
