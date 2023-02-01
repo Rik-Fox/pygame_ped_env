@@ -434,7 +434,7 @@ class MaskableDQN(OffPolicyAlgorithm):
         self.policy = self.policy.to(self.device)
 
         if not isinstance(self.policy, MaskableDQNPolicy):
-            raise ValueError("Policy must subclass MaskableActorCriticPolicy")
+            raise ValueError("Policy must be MaskableDQNPolicy")
 
         # self.rollout_buffer = buffer_cls(
         #     self.n_steps,

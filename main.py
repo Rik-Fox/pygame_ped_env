@@ -175,7 +175,7 @@ if __name__ == "__main__":
 
     if args.basic_model is None:
         args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "maskedDQN_init_model"
+            args.log_path, "simple_reward_agent", "maskedDQN_init_model_480"
         )
 
     if args.eval_basic_model is None:
@@ -183,7 +183,7 @@ if __name__ == "__main__":
 
     if args.attr_model is None:
         args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
+            args.log_path, "shaped_reward_agent", "maskedDQN_init_model_480"
         )
 
     if args.eval_attr_model is None:
