@@ -106,3 +106,6 @@ param_parser.add_argument(
     action="store_true",
     help="if True, continue training agent from load state, else start new training epoch",
 )
+
+param_parser.add_argument("--num_cpus", type=int, default=4)
+param_parser.add_argument("--num_gpus", type=int, default=1)

@@ -19,6 +19,8 @@ from pygame_ped_env.envs import RLCrossingSim
 from pygame_ped_env.utils.param_parser import param_parser
 from pygame_ped_env.utils.custom_logging import CustomTrackingCallback
 
+import ray
+
 
 def mask_fn(env: gym.Env) -> np.ndarray:
     # Do whatever you'd like in this function to return the action mask
@@ -27,16 +29,12 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     return env.action_masks()
 
 
-def Main(args=param_parser.parse_args()):
-
-    ### IMPORTANT ###
-    # must use correct scenario set otherwise will be updated for rewards
-    # recieved by other models actions; these varibles switch to the shaped model
-    # and all it's appropriate scenarios etc to train with only a boolean flag
-    if args.shaped_agent:
-        # attribute based reward agent
-        args.model_name = "shaped_reward_agent"
-
+@ray.remote
+def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_args()):
+    args.model_name = (
+        f"{np.round(speed_coeff,2)}_{np.round(pos_coeff,2)}_{np.round(steer_coeff,2)}"
+    )
+    args.exp_log_name = f"MaskedDQN_retrain"
     log_path = os.path.join(
         args.log_path,
         args.model_name,
@@ -71,9 +69,9 @@ def Main(args=param_parser.parse_args()):
             "basic_model": args.basic_model,
             "attr_model": args.attr_model,
             "log_path": log_path,
-            "speed_coefficient": args.speed_coefficient,
-            "position_coefficient": args.position_coefficient,
-            "steering_coefficient": args.steering_coefficient,
+            "speed_coefficient": speed_coeff,
+            "position_coefficient": pos_coeff,
+            "steering_coefficient": steer_coeff,
         },
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
@@ -96,9 +94,9 @@ def Main(args=param_parser.parse_args()):
             "basic_model": args.eval_basic_model,
             "attr_model": args.eval_attr_model,
             "log_path": eval_log_path,
-            "speed_coefficient": args.eval_speed_coefficient,
-            "position_coefficient": args.eval_position_coefficient,
-            "steering_coefficient": args.eval_steering_coefficient,
+            "speed_coefficient": speed_coeff,
+            "position_coefficient": pos_coeff,
+            "steering_coefficient": steer_coeff,
         },
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
@@ -130,13 +128,7 @@ def Main(args=param_parser.parse_args()):
                     min_evals=int(1e6),
                     verbose=args.eval_verbose,
                 ),
-                callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
-                    reward_threshold=0
-                    # reward_threshold=(
-                    #     eval_env.envs[0].get_max_reward(args.shaped_agent) / 2
-                    # )
-                    # * 0.98
-                ),
+                callback_on_new_best=None,
                 n_eval_episodes=args.eval_episodes,
                 eval_freq=args.eval_interval,
                 log_path=log_path,
@@ -149,98 +141,108 @@ def Main(args=param_parser.parse_args()):
     # for i in range(args.n_envs):
     #     env.envs[i].modelL.set_env(env.envs[i])
 
+    loaded_model = env.envs[0].modelA
+
     env.envs[0].modelL.verbose = args.verbose
 
-    if args.cont:
-        if args.shaped_agent:
-            loaded_model = env.envs[0].modelA
-        else:
-            loaded_model = env.envs[0].modelB
-
-        env.envs[0].modelL._episode_num = loaded_model._episode_num
-        env.envs[0].modelL._n_calls = loaded_model._n_calls
-        env.envs[0].modelL._n_updates = loaded_model._n_updates
-        env.envs[0].modelL.num_timesteps = loaded_model.num_timesteps
-        env.envs[0].modelL.replay_buffer = loaded_model.replay_buffer
-        env.envs[0].modelL.learning_starts = 0
-        # env.envs[0].modelL.load_replay_buffer(loaded_model.replay_buffer)
-        env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
-            loaded_model.exploration_rate,
-            loaded_model.exploration_final_eps,
-            np.clip(
-                (
-                    loaded_model._current_progress_remaining
-                    - (1 - loaded_model.exploration_fraction)
-                )
-                / loaded_model.exploration_fraction,
-                0,
-                1,
-            ),
-        )
-        total_timesteps = loaded_model._total_timesteps - loaded_model.num_timesteps
-        # tb_log_name = loaded_model.tensorboard_log
-        # log_interval = loaded_model.log_interval
-        reset_num_timesteps = False
-    else:
-        env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
-            args.exploration_initial_eps,
-            args.exploration_final_eps,
-            args.exploration_fraction,
-        )
-        total_timesteps = 1000 * args.n_episodes
-        # tb_log_name = os.path.join(log_path, "tb_logs")
-        # log_interval = args.log_interval / 10
-        reset_num_timesteps = True
+    env.envs[0].modelL._episode_num = loaded_model._episode_num
+    env.envs[0].modelL._n_calls = loaded_model._n_calls
+    env.envs[0].modelL._n_updates = loaded_model._n_updates
+    env.envs[0].modelL.num_timesteps = loaded_model.num_timesteps
+    env.envs[0].modelL.replay_buffer = loaded_model.replay_buffer
+    env.envs[0].modelL.learning_starts = 0
+    # env.envs[0].modelL.load_replay_buffer(loaded_model.replay_buffer)
+    env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
+        args.exploration_initial_eps,
+        args.exploration_final_eps,
+        args.exploration_fraction,
+    )
 
     env.envs[0].modelL.learn(
-        total_timesteps=total_timesteps,
+        total_timesteps=1000 * args.n_episodes,
         tb_log_name=os.path.join(log_path, "tb_logs"),
         callback=callbacks,
         log_interval=args.log_interval / 10,
-        reset_num_timesteps=reset_num_timesteps,
+        reset_num_timesteps=True,
         # log_interval=10,
     )
 
     env.envs[0].modelL.save(os.path.join(log_path, "final_model"), include="env")
+
+    return env.envs[0].modelL
+
+
+def Main(args=param_parser.parse_args()):
+
+    ray.init(num_cpus=args.num_cpus, num_gpus=args.num_gpus)
+
+    output_ids = []
+
+    coeff_map = {
+        0: float(1 / 4),
+        1: float(1 / 3),
+        2: float(1 / 2),
+        3: float(1),
+        4: float(2),
+        5: float(3),
+        6: float(4),
+    }
+
+    for k in range(7):
+        for j in range(7):
+            for i in range(7):
+                output_ids.append(
+                    Train_variant.remote(coeff_map[i], coeff_map[j], coeff_map[k], args)
+                    # Train_variant(coeff_map[i], coeff_map[j], coeff_map[k], args)
+                )
+    # ray remote is non terminating so need to wait for all to finish
+    # .get() is a blocking call making this script wait for all to finish
+    for model in ray.get(output_ids):
+        print(model._episode_num)
 
 
 if __name__ == "__main__":
 
     args = param_parser.parse_args()
 
+    args.shaped_agent = True
+
+    args.n_episodes = int(1e5)
+
     # if log path not specificed then set to default outside of code folder
     if args.log_path is None:
         wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        args.log_path = os.path.join(wkdir, "logs")
+        args.log_path = os.path.join(wkdir, "logs", "shaped_reward_agent_variants")
 
     if args.basic_model is None:
-        # args.basic_model = os.path.join(
-        #     args.log_path, "simple_reward_agent", "maskedDQN_init_model_480"
-        # )
         args.basic_model = os.path.join(
-            args.log_path, "simple_reward_agent", "maskedDQN_init_model_480"
+            os.path.dirname(args.log_path),
+            "simple_reward_agent",
+            "maskedDQN_init_model_480",
         )
     if args.eval_basic_model is None:
         args.eval_basic_model = args.basic_model
 
     if args.attr_model is None:
-        args.attr_model = os.path.join(
-            args.log_path, "shaped_reward_agent", "maskedDQN_init_model_480"
-        )
-        # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_train_neg/checkpoints/maskedDQN_at_48000000_steps"
+        print("No model given, using default untrained model!")
+        # args.attr_model = os.path.join(
+        #     os.path.dirname(args.log_path),
+        #     "shaped_reward_agent",
+        #     "maskedDQN_init_model_480",
+        # )
+        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
 
     if args.scenarioList is None:
-        if args.shaped_agent:
-            args.scenarioList = [0, 1]
-            args.eval_scenarioList = [0, 1]
-        else:
-            args.scenarioList = [8, 9]
-            args.eval_scenarioList = [8, 9]
-    else:
-        args.scenarioList = [int(i) for i in args.scenarioList]
-        args.eval_scenarioList = args.scenarioList
+        args.scenarioList = [0, 1]
+        args.eval_scenarioList = [0, 1]
+
+    args.verbose = 0
+
+    args.exploration_initial_eps = 0.5
+    args.exploration_final_eps = 0.01
+    args.exploration_fraction = 0.25
 
     Main(args=args)

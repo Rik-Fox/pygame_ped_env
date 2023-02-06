@@ -311,15 +311,20 @@ class RLCrossingSim(gym.Env):
             done = True
         else:
             position_rwd = (
-                -np.linalg.norm(agent.sprite.dist_to_objective(), ord=1)
+                np.linalg.norm(agent.sprite.dist_to_objective(), ord=1)
                 / self.screen_rect.w
             )  # ord=1 is manhattan distance
 
+        # rewarded for going as fast as possible, speed as fraction of top speed
+        speed_rwd = (
+            np.maximum(
+                np.abs(agent.sprite.moved[-1][0]), np.abs(agent.sprite.moved[-1][1])
+            )
+            / agent.sprite.speed
+        )
+
         # movement vector magnitude for this action
         delta_rho_1 = np.hypot(agent.sprite.moved[-1][0], agent.sprite.moved[-1][1])
-
-        # rewarded for going as fast as possible, speed as fraction of top speed
-        speed_rwd = delta_rho_1 / agent.sprite.speed
 
         # movement vector magnitude for previous action
         delta_rho_2 = np.hypot(agent.sprite.moved[-2][0], agent.sprite.moved[-2][1])
