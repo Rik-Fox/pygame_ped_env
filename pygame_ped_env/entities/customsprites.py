@@ -7,23 +7,29 @@ from pygame_ped_env.entities.spritesheet import SpriteSheet, SpriteStripAnim
 
 
 class Pedestrian(Sprite):
-    def __init__(self, x, y, direction, *groups: AbstractGroup) -> None:
+    def __init__(self, x, y, direction, *groups: AbstractGroup, headless=True) -> None:
 
         self.speed = 2
 
-        self.init_anim(
-            os.path.join(
-                os.path.dirname(pygame_ped_env.__file__),
-                "images/guy.png",
+        self.headless = headless
+
+        if not self.headless:
+            self.init_anim(
+                os.path.join(
+                    os.path.dirname(pygame_ped_env.__file__),
+                    "images/guy.png",
+                )
             )
-        )
-        self.set_direction(direction)
+            self.set_direction(direction)
 
-        self.image = self._anim[direction].next()
+            self.image = self._anim[direction].next()
 
-        self.rect = self.image.get_rect()
-        self.rect.centerx = x
-        self.rect.centery = y
+            self.rect = self.image.get_rect()
+            self.rect.centerx = x
+            self.rect.centery = y
+        else:
+            self.set_direction(direction)
+            self.rect = pygame.Rect(x, y, 16, 25)
 
         self.moved = 0
 
@@ -76,13 +82,15 @@ class Pedestrian(Sprite):
             self.rect.y -= self.speed
             if -0.5 < noise < 0.5:
                 self.rect.x += noise
-
-        # self.image = self._anim[self._direction].next()
-        self.image = self.animate(self._direction)
+        if not self.headless:
+            # self.image = self._anim[self._direction].next()
+            self.image = self.animate(self._direction)
 
 
 class Vehicle(Sprite):
-    def __init__(self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup):
+    def __init__(
+        self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup, headless=True
+    ):
 
         speeds = {
             "car": 3,
@@ -107,18 +115,23 @@ class Vehicle(Sprite):
         self.speed = speeds[vehicleClass]
         self.colour = random.choice(colours)
         self.direction = direction
-        path = os.path.join(
-            os.path.dirname(pygame_ped_env.__file__),
-            "images",
-            direction,
-            f"{self.colour}_{vehicleClass}.png",
-        )
-        self.image = pygame.image.load(path)
-        self.image.set_colorkey((255, 0, 255))
-        self.image = pygame.transform.scale(self.image, (60, 30))
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
+
+        if not headless:
+            path = os.path.join(
+                os.path.dirname(pygame_ped_env.__file__),
+                "images",
+                direction,
+                f"{self.colour}_{vehicleClass}.png",
+            )
+            self.image = pygame.image.load(path)
+            self.image.set_colorkey((255, 0, 255))
+            self.image = pygame.transform.scale(self.image, (60, 30))
+            self.rect = self.image.get_rect()
+            self.rect.x = x
+            self.rect.y = y
+        else:
+            self.image = None
+            self.rect = pygame.Rect(x, y, 60, 30)
 
         if self.direction == "right":
             self.rect.bottom = y - self.lane_offset - 5

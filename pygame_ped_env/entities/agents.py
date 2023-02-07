@@ -8,10 +8,38 @@ import numpy as np
 import pickle
 
 
+def genAction_map():
+    return {
+        0: np.array([0, 1]),  # "down"
+        1: np.array([-1, 1]),  # "downleft"
+        2: np.array([-1, 0]),  # "left"
+        3: np.array([-1, -1]),  # "upleft"
+        4: np.array([0, -1]),  # "up"
+        5: np.array([1, -1]),  # "upright"
+        6: np.array([1, 0]),  # "right"
+        7: np.array([1, 1]),  # "downright"
+    }
+
+
+def genSpeed_map(speed):
+    return {
+        0: np.floor(speed * (1 / 3)),  # "slow"
+        1: np.floor(speed * (2 / 3)),  # "medium"
+        2: np.floor(speed * (1)),  # "fast"
+        3: 0.0,  # "nomove"
+    }
+
+
 class RLVehicle(Vehicle):
+
     # class for hooking in RL algorithms
     def __init__(
-        self, window_size, vehicleClass: str, direction: str, *groups: AbstractGroup
+        self,
+        window_size,
+        vehicleClass: str,
+        direction: str,
+        *groups: AbstractGroup,
+        headless=True
     ) -> None:
 
         if direction == "right":
@@ -25,7 +53,9 @@ class RLVehicle(Vehicle):
                 'Only "left" and "right" directions are implemented for vehicles'
             )
 
-        super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
+        super().__init__(
+            start[0], start[1], 2, vehicleClass, direction, *groups, headless=headless
+        )
         if direction == "right":
             self.rect.midleft += np.array(self.rect.size[0])
         elif direction == "left":
@@ -42,22 +72,8 @@ class RLVehicle(Vehicle):
         self.init_pos = np.array(start)
         self.objective = np.array(end)
 
-        self.action_map = {
-            0: np.array([0, 1]),  # "down"
-            1: np.array([-1, 1]),  # "downleft"
-            2: np.array([-1, 0]),  # "left"
-            3: np.array([-1, -1]),  # "upleft"
-            4: np.array([0, -1]),  # "up"
-            5: np.array([1, -1]),  # "upright"
-            6: np.array([1, 0]),  # "right"
-            7: np.array([1, 1]),  # "downright"
-        }
-        self.speed_map = {
-            0: np.floor(self.speed * (1 / 3)),  # "slow"
-            1: np.floor(self.speed * (2 / 3)),  # "medium"
-            2: np.floor(self.speed * (1)),  # "fast"
-            3: 0.0,  # "nomove"
-        }
+        self.action_map = genAction_map()
+        self.speed_map = genSpeed_map(self.speed)
 
     def dist_to_objective(self, pos=np.array([None, None])):
         if pos.any():
@@ -127,7 +143,12 @@ class RLVehicle(Vehicle):
 
 class RandomVehicle(Vehicle):
     def __init__(
-        self, window_size, vehicleClass: str, direction: str, *groups: AbstractGroup
+        self,
+        window_size,
+        vehicleClass: str,
+        direction: str,
+        *groups: AbstractGroup,
+        headless=True
     ) -> None:
         if direction == "right":
             start = [0, window_size[1] / 2]
@@ -140,36 +161,38 @@ class RandomVehicle(Vehicle):
                 'Only "left" and "right" directions are implemented for vehicles'
             )
 
-        super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
+        super().__init__(
+            start[0], start[1], 2, vehicleClass, direction, *groups, headless=headless
+        )
 
     def update(self):
 
         direction = self.get_direction()
 
-        def polarRandom(dx, dy):
-
-            epsilon = ((np.random.rand() * 2) - 1) / 200
-            # epsilon = 0
-
-            r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
-            theta = np.arctan((self.rect.y + dy) / (self.rect.x + dx))
-
-            self.rect.x = np.round(r * np.cos(theta + epsilon))
-            self.rect.y = np.round(r * np.sin(theta + epsilon))
-
         if direction == "up":
-            polarRandom(0, -self.speed)
+            self.polarRandom(0, -self.speed)
         elif direction == "down":
-            polarRandom(0, self.speed)
+            self.polarRandom(0, self.speed)
         elif direction == "left":
-            polarRandom(-self.speed, 0)
+            self.polarRandom(-self.speed, 0)
         elif direction == "right":
-            polarRandom(self.speed, 0)
-
-        self.animate(direction)
+            self.polarRandom(self.speed, 0)
+        if not self.headless:
+            self.animate(direction)
 
     def act(self, action):
         self.update()
+
+    def polarRandom(self, dx, dy):
+
+        epsilon = ((np.random.rand() * 2) - 1) / 200
+        # epsilon = 0
+
+        r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
+        theta = np.arctan((self.rect.y + dy) / (self.rect.x + dx))
+
+        self.rect.x = np.round(r * np.cos(theta + epsilon))
+        self.rect.y = np.round(r * np.sin(theta + epsilon))
 
 
 class KeyboardVehicle(Vehicle):
@@ -193,7 +216,9 @@ class KeyboardVehicle(Vehicle):
                 'Only "left" and "right" directions are implemented for vehicles'
             )
 
-        super().__init__(start[0], start[1], 2, vehicleClass, direction, *groups)
+        super().__init__(
+            start[0], start[1], 2, vehicleClass, direction, *groups, headless=False
+        )
         self.rect.x += start_offset
         self.init_pos = [self.rect.x, self.rect.y]
         self.moved = [np.array([0, 0])]
@@ -289,47 +314,50 @@ class KeyboardVehicle(Vehicle):
 
 
 class RandomPedestrian(Pedestrian):
-    def __init__(self, x, y, init_direction, *groups: AbstractGroup) -> None:
-        super().__init__(x, y, init_direction, *groups)
+    def __init__(
+        self, x, y, init_direction, *groups: AbstractGroup, headless=True
+    ) -> None:
+        super().__init__(x, y, init_direction, *groups, headless=headless)
 
     def update(self):
 
         direction = self.get_direction()
 
-        def polarRandom(dx, dy):
-            epsilon = ((np.random.rand() * 2) - 1) / 50
-            # epsilon = 0
-            if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
-                self.rect.x += 1
-                self.rect.y += 1
-            else:
-                r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
-                with np.errstate(divide="ignore"):
-                    theta = np.arctan(
-                        np.divide(np.abs(self.rect.y + dy), np.abs(self.rect.x + dx))
-                    )
-
-                if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
-                    theta = 0
-                self.rect.x = np.round(r * np.cos(theta + epsilon))
-                self.rect.y = np.round(r * np.sin(theta + epsilon))
-
         if direction == "up":
-            polarRandom(0, -self.speed)
+            self.polarRandom(0, -self.speed)
         elif direction == "down":
-            polarRandom(0, self.speed)
+            self.polarRandom(0, self.speed)
         elif direction == "left":
-            polarRandom(-self.speed, 0)
+            self.polarRandom(-self.speed, 0)
         elif direction == "right":
-            polarRandom(self.speed, 0)
+            self.polarRandom(self.speed, 0)
 
-        self.animate(direction)
+        if not self.headless:
+            self.animate(direction)
+
+    def polarRandom(self, dx, dy):
+        epsilon = ((np.random.rand() * 2) - 1) / 50
+        # epsilon = 0
+        if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
+            self.rect.x += 1
+            self.rect.y += 1
+        else:
+            r = np.sqrt(((self.rect.x + dx) ** 2 + (self.rect.y + dy) ** 2))
+            with np.errstate(divide="ignore"):
+                theta = np.arctan(
+                    np.divide(np.abs(self.rect.y + dy), np.abs(self.rect.x + dx))
+                )
+
+            if ((self.rect.x + dx) == 0) and ((self.rect.y + dy) == 0):
+                theta = 0
+            self.rect.x = np.round(r * np.cos(theta + epsilon))
+            self.rect.y = np.round(r * np.sin(theta + epsilon))
 
 
 class KeyboardPedestrian(Pedestrian):
     def __init__(self, x, y, init_direction, *groups: AbstractGroup) -> None:
 
-        super().__init__(x, y, init_direction, *groups)
+        super().__init__(x, y, init_direction, *groups, headless=False)
 
         self.init_pos = [self.rect.x, self.rect.y]
         self.moved = [np.array([0, 0])]

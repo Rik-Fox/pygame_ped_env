@@ -281,16 +281,16 @@ class MaskableDQNPolicy(BasePolicy):
             )
         )
 
-        def set_training_mode(self, mode: bool) -> None:
-            """
-            Put the policy in either training or evaluation mode.
+    def set_training_mode(self, mode: bool) -> None:
+        """
+        Put the policy in either training or evaluation mode.
 
-            This affects certain modules, such as batch normalisation and dropout.
+        This affects certain modules, such as batch normalisation and dropout.
 
-            :param mode: if true, set to training mode, else set to evaluation mode
-            """
-            self.q_net.set_training_mode(mode)
-            self.training = mode
+        :param mode: if true, set to training mode, else set to evaluation mode
+        """
+        self.q_net.set_training_mode(mode)
+        self.training = mode
 
 
 SelfMaskableDQN = TypeVar("SelfMaskableDQN", bound="MaskableDQN")
