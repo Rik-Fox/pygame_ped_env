@@ -215,24 +215,22 @@ if __name__ == "__main__":
         args.log_path = os.path.join(wkdir, "logs", "shaped_reward_agent_variants")
 
     if args.basic_model is None:
-        # args.basic_model = os.path.join(
-        #     os.path.dirname(args.log_path),
-        #     "simple_reward_agent",
-        #     "maskedDQN_init_model_480",
-        # )
-        args.basic_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
-
+        args.basic_model = os.path.join(
+            os.path.dirname(args.log_path),
+            "simple_reward_agent",
+            "maskedDQN_init_model_480",
+        )
     if args.eval_basic_model is None:
         args.eval_basic_model = args.basic_model
 
     if args.attr_model is None:
         print("No model given, using default untrained model!")
-        # args.attr_model = os.path.join(
-        #     os.path.dirname(args.log_path),
-        #     "shaped_reward_agent",
-        #     "maskedDQN_init_model_480",
-        # )
-        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
+        args.attr_model = os.path.join(
+            os.path.dirname(args.log_path),
+            "shaped_reward_agent",
+            "maskedDQN_init_model_480",
+        )
+        # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
