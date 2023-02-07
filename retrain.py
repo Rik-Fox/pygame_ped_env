@@ -225,12 +225,12 @@ if __name__ == "__main__":
 
     if args.attr_model is None:
         print("No model given, using default untrained model!")
-        # args.attr_model = os.path.join(
-        #     os.path.dirname(args.log_path),
-        #     "shaped_reward_agent",
-        #     "maskedDQN_init_model_480",
-        # )
-        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
+        args.attr_model = os.path.join(
+            os.path.dirname(args.log_path),
+            "shaped_reward_agent",
+            "maskedDQN_init_model_480",
+        )
+        # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
 
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model

@@ -311,7 +311,7 @@ class RLCrossingSim(gym.Env):
             done = True
         else:
             position_rwd = (
-                np.linalg.norm(agent.sprite.dist_to_objective(), ord=1)
+                ((self.screen_rect.w - np.linalg.norm(agent.sprite.dist_to_objective(), ord=1)) +1e-15)
                 / self.screen_rect.w
             )  # ord=1 is manhattan distance
 
