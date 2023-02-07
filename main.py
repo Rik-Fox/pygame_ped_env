@@ -220,6 +220,7 @@ if __name__ == "__main__":
         args.basic_model = os.path.join(
             args.log_path, "simple_reward_agent", "maskedDQN_init_model_480"
         )
+
     if args.eval_basic_model is None:
         args.eval_basic_model = args.basic_model
 

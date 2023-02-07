@@ -234,7 +234,7 @@ class RLCrossingSim(gym.Env):
             # function for social rewards
             # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
             p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
-
+            print(p_rwd)
             # linearly combine rewards
             # apply convex or concave adjustment, and then shift to [-1,0)
             rwd = (
@@ -310,10 +310,18 @@ class RLCrossingSim(gym.Env):
             self.info["done_cause"] = "objective_reached"
             done = True
         else:
-            position_rwd = (
-                ((self.screen_rect.w - np.linalg.norm(agent.sprite.dist_to_objective(), ord=1)) +1e-15)
-                / self.screen_rect.w
+            # rwd for distance to goal
+            # max dist same for left and right by symmetry, so just use left
+            # dist from midright to topleft same as from either right corner to midleft
+            # +20 to allow for vehicle size/lane offset
+            max_dist = (
+                np.linalg.norm(self.screen_rect.midright, ord=1) + 20
             )  # ord=1 is manhattan distance
+            position_rwd = (
+                (max_dist - np.linalg.norm(agent.sprite.dist_to_objective(), ord=1))
+                # +1e-15 to avoid 0 issues
+                + 1e-15
+            ) / max_dist
 
         # rewarded for going as fast as possible, speed as fraction of top speed
         speed_rwd = (
