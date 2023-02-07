@@ -234,7 +234,6 @@ class RLCrossingSim(gym.Env):
             # function for social rewards
             # speed_rwd, position_rwd, heading_rwd, collide_rwd, done = self.get_primitive_reward(agent)
             p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
-            print(p_rwd)
             # linearly combine rewards
             # apply convex or concave adjustment, and then shift to [-1,0)
             rwd = (
