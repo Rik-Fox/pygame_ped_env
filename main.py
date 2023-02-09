@@ -171,8 +171,7 @@ def Main(args=param_parser.parse_args()):
                 (
                     loaded_model._current_progress_remaining
                     - (1 - loaded_model.exploration_fraction)
-                )
-                / loaded_model.exploration_fraction,
+                ),
                 0,
                 1,
             ),

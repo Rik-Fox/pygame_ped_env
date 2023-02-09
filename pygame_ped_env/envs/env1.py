@@ -236,12 +236,17 @@ class RLCrossingSim(gym.Env):
             p_rwd, s_rwd, h_rwd, c_rwd, done = self.get_primitive_reward(agent)
             # linearly combine rewards
             # apply convex or concave adjustment, and then shift to [-1,0)
-            rwd = (
-                (np.power(p_rwd, self.pos_coeff) - 1)
-                + (np.power(s_rwd, self.speed_coeff) - 1)
-                + (np.power(h_rwd, self.steer_coeff) - 1)
-                + c_rwd
-            )
+            try:
+                rwd = (
+                    (np.power(p_rwd, self.pos_coeff) - 1)
+                    + (np.power(s_rwd, self.speed_coeff) - 1)
+                    + (np.power(h_rwd, self.steer_coeff) - 1)
+                    + c_rwd
+                )
+            except:
+                print(p_rwd, s_rwd, h_rwd, c_rwd, done)
+                import pdb
+                pdb.set_trace()
 
             # rwd = (
             #     (np.power(p_rwd, self.pos_coeff))
