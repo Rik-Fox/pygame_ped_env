@@ -39,7 +39,6 @@ class RLCrossingSim(gym.Env):
         position_coefficient=1.0,
         steering_coefficient=1.0,
     ) -> None:
-
         super().__init__()
         np.random.seed(seed)
 
@@ -215,7 +214,6 @@ class RLCrossingSim(gym.Env):
         horizontal_road.rect.midleft = (0, self.screen_rect.h / 2)
 
     def get_reward(self, agent: RLVehicle):
-
         if isinstance(agent.sprite, KeyboardVehicle):
             done = False
             if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
@@ -494,11 +492,15 @@ class RLCrossingSim(gym.Env):
         self.vehicle.empty()
         agent = scenario["agentSprites"][0]
         if agent[0] == "R":
-            agentL = RLVehicle.init_from_scenario(agent, self.screen_rect.size)
+            agentL = RLVehicle.init_from_scenario(
+                agent, self.screen_rect.size, headless=self.headless
+            )
             agentL.model = self.modelA
             self.simple_reward = False
         elif agent[0] == "S":
-            agentL = RLVehicle.init_from_scenario(agent[1:], self.screen_rect.size)
+            agentL = RLVehicle.init_from_scenario(
+                agent[1:], self.screen_rect.size, headless=self.headless
+            )
             agentL.model = self.modelB
             self.simple_reward = True
         else:
@@ -540,12 +542,12 @@ class RLCrossingSim(gym.Env):
 
             if traffic_agent[0] == "R":
                 agentT = RLVehicle.init_from_scenario(
-                    traffic_agent, self.screen_rect.size
+                    traffic_agent, self.screen_rect.size, headless=self.headless
                 )
                 agentT.model = self.modelA
             elif traffic_agent[0] == "S":
                 agentT = RLVehicle.init_from_scenario(
-                    traffic_agent[1:], self.screen_rect.size
+                    traffic_agent[1:], self.screen_rect.size, headless=self.headless
                 )
                 agentT.model = self.modelB
             else:
@@ -604,6 +606,7 @@ class RLCrossingSim(gym.Env):
                     (self.screen_rect.w / 2) + (np.random.rand() * 4) - 2,
                     (self.screen_rect.h * (7 / 8)) + (np.random.rand() * 4) - 2,
                     "up",
+                    headless=self.headless,
                 )
             )
         else:
@@ -618,7 +621,6 @@ class RLCrossingSim(gym.Env):
             self.screen = pygame.display.set_mode(self.screen_rect.size)
             pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
             self.background = self.generateBackground()
-
             # grey out screen and wait 1 second
             # on starting next scenario when rendering
             self.screen.fill([127, 127, 127])
@@ -686,7 +688,6 @@ class RLCrossingSim(gym.Env):
 
     @classmethod
     def init_scenario(cls, scenario, sim_area, **kwargs):
-
         # entities = []
         # scen = cls.scenario_map()[scenario]
         # for agent in scen.agentSprites:
