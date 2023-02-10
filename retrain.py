@@ -29,7 +29,7 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     return env.action_masks()
 
 
-@ray.remote
+@ray.remote(num_cpus=1,num_gpus=1/8)
 def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_args()):
     args.model_name = (
         f"{np.round(speed_coeff,2)}_{np.round(pos_coeff,2)}_{np.round(steer_coeff,2)}"
@@ -188,8 +188,8 @@ def Main(args=param_parser.parse_args()):
         6: float(4),
     }
 
-    for k in range(7):
-        for j in range(7):
+    for k in range(1):
+        for j in range(1):
             for i in range(7):
                 output_ids.append(
                     Train_variant.remote(coeff_map[i], coeff_map[j], coeff_map[k], args)
