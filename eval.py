@@ -16,7 +16,6 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 
 def Eval(args=param_parser.parse_args()):
-
     # if log path not specificed then set to default outside of code folder
     if args.log_path is None:
         wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,8 +25,7 @@ def Eval(args=param_parser.parse_args()):
         # args.basic_model = os.path.join(
         #     args.log_path, "simple_reward_agent", "maskedDQN_init_model"
         # )
-        args.basic_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/simple_reward_agent/maskedDQN_best_model.zip"
-
+        args.basic_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_134000000_steps.zip"
     if args.eval_basic_model is None:
         args.eval_basic_model = args.basic_model
 
@@ -35,8 +33,7 @@ def Eval(args=param_parser.parse_args()):
         # args.attr_model = os.path.join(
         #     args.log_path, "shaped_reward_agent", "maskedDQN_init_model"
         # )
-        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/logs/shaped_reward_agent/maskedDQN_best_model.zip"
-
+        args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_134000000_steps.zip"
     if args.eval_attr_model is None:
         args.eval_attr_model = args.attr_model
 
@@ -44,6 +41,7 @@ def Eval(args=param_parser.parse_args()):
     # must use correct scenario set otherwise will be updated for rewards
     # recieved by other models actions; these varibles switch to the shaped model
     # and all it's appropriate scenarios etc to train with only a boolean flag
+    args.shaped_agent = True
     if args.shaped_agent:
         # attribute based reward agent
         args.model_name = "shaped_reward_agent"
@@ -56,7 +54,7 @@ def Eval(args=param_parser.parse_args()):
     )
     os.makedirs(log_path, exist_ok=True)
 
-    scenarios = [0, 1, 8, 9]
+    scenarios = [0, 1]
 
     env = RLCrossingSim(
         sim_area=args.sim_area,

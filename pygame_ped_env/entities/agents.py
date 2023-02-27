@@ -31,7 +31,6 @@ def genSpeed_map(speed):
 
 
 class RLVehicle(Vehicle):
-
     # class for hooking in RL algorithms
     def __init__(
         self,
@@ -39,9 +38,8 @@ class RLVehicle(Vehicle):
         vehicleClass: str,
         direction: str,
         *groups: AbstractGroup,
-        headless=True
+        headless=True,
     ) -> None:
-
         if direction == "right":
             start = [0, window_size[1] / 2]
             end = [window_size[0], window_size[1] / 2]
@@ -110,7 +108,6 @@ class RLVehicle(Vehicle):
             self.rect.center += np.array([-1, 0])  # just move left
 
     def save(self, file):
-
         self.model.save(file.split(".")[0])
         save_dict = {
             "direction": self.direction,
@@ -134,11 +131,15 @@ class RLVehicle(Vehicle):
         self.replay = True
 
     @classmethod
-    def init_from_scenario(cls, scenario: str, window_size):
+    def init_from_scenario(
+        cls, scenario: str, window_size, *groups: AbstractGroup, **kwargs
+    ):
         if scenario == ("RL_left" or "SRL_left"):
-            return cls(window_size, "car", "left")
+            return cls(window_size, "car", "left", *groups, headless=kwargs["headless"])
         else:
-            return cls(window_size, "car", "right")
+            return cls(
+                window_size, "car", "right", *groups, headless=kwargs["headless"]
+            )
 
 
 class RandomVehicle(Vehicle):
@@ -147,8 +148,8 @@ class RandomVehicle(Vehicle):
         window_size,
         vehicleClass: str,
         direction: str,
+        headless=True,
         *groups: AbstractGroup,
-        headless=True
     ) -> None:
         if direction == "right":
             start = [0, window_size[1] / 2]
@@ -166,7 +167,6 @@ class RandomVehicle(Vehicle):
         )
 
     def update(self):
-
         direction = self.get_direction()
 
         if direction == "up":
@@ -184,7 +184,6 @@ class RandomVehicle(Vehicle):
         self.update()
 
     def polarRandom(self, dx, dy):
-
         epsilon = ((np.random.rand() * 2) - 1) / 200
         # epsilon = 0
 
@@ -202,7 +201,7 @@ class KeyboardVehicle(Vehicle):
         vehicleClass: str,
         direction: str,
         load_path=None,
-        *groups: AbstractGroup
+        *groups: AbstractGroup,
     ) -> None:
         self.direction = direction
         if self.direction == "right":
@@ -320,7 +319,6 @@ class RandomPedestrian(Pedestrian):
         super().__init__(x, y, init_direction, *groups, headless=headless)
 
     def update(self):
-
         direction = self.get_direction()
 
         if direction == "up":
@@ -356,7 +354,6 @@ class RandomPedestrian(Pedestrian):
 
 class KeyboardPedestrian(Pedestrian):
     def __init__(self, x, y, init_direction, *groups: AbstractGroup) -> None:
-
         super().__init__(x, y, init_direction, *groups, headless=False)
 
         self.init_pos = [self.rect.x, self.rect.y]
