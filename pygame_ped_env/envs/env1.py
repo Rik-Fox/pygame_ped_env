@@ -241,12 +241,7 @@ class RLCrossingSim(gym.Env):
                 + c_rwd
             )
             if np.isnan(rwd):
-                rwd = (
-                    (p_rwd-1)
-                    + (s_rwd-1)
-                    + (h_rwd-1)
-                    + c_rwd
-                )
+                rwd = (p_rwd - 1) + (s_rwd - 1) + (h_rwd - 1) + c_rwd
 
         return rwd, done
 
@@ -658,6 +653,9 @@ class RLCrossingSim(gym.Env):
 
                 self.render()
         pygame.quit()
+
+    def load_model(self, path):
+        return self._load_model_from_string(path)
 
     def close(self, saveDir=None, info=None):
         if not self.headless:
