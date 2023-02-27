@@ -1,4 +1,4 @@
-import os
+import os, shutil
 import gym
 import numpy as np
 
@@ -29,32 +29,58 @@ def mask_fn(env: gym.Env) -> np.ndarray:
     return env.action_masks()
 
 
-@ray.remote(num_cpus=1,num_gpus=1/8)
+@ray.remote(num_cpus=1,num_gpus=1/8,max_retries=-1, retry_exceptions=True)
 def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_args()):
     args.model_name = (
-        f"{np.round(speed_coeff,2)}_{np.round(pos_coeff,2)}_{np.round(steer_coeff,2)}"
-    )
-    args.exp_log_name = f"MaskedDQN_retrain"
-    log_path = os.path.join(
+                    f"{np.round(speed_coeff,2)}_{np.round(pos_coeff,2)}_{np.round(steer_coeff,2)}"
+                )
+    args.exp_log_name = f"maskedDQN_retrain_logs"
+    args.var_log_path = os.path.join(
         args.log_path,
         args.model_name,
         args.exp_log_name,
     )
 
-    monitor_path = os.path.join(log_path, "monitor_files")
+    args.monitor_path = os.path.join(args.var_log_path, "monitor_files")
 
-    eval_log_path = os.path.join(
+    args.var_eval_log_path = os.path.join(
         args.log_path,
         args.model_name,
         args.eval_log_name,
     )
 
-    eval_monitor_path = os.path.join(eval_log_path, "monitor_files")
+    args.eval_monitor_path = os.path.join(args.var_eval_log_path, "monitor_files")
 
-    os.makedirs(log_path, exist_ok=True)
-    os.makedirs(eval_log_path, exist_ok=True)
-    os.makedirs(monitor_path, exist_ok=True)
-    os.makedirs(eval_monitor_path, exist_ok=True)
+    os.makedirs(args.var_log_path, exist_ok=True)
+    os.makedirs(args.var_eval_log_path, exist_ok=True)
+    os.makedirs(args.monitor_path, exist_ok=True)
+    os.makedirs(args.eval_monitor_path, exist_ok=True)
+    
+    cp_path = os.path.join(args.var_log_path,"checkpoints")
+    # print("cp_path ",cp_path)  
+    os.makedirs(cp_path, exist_ok=True)
+    cps = os.listdir(cp_path)
+    # print("cps ",cps)
+    if cps:
+        pass
+    else:
+        shutil.copy(args.attr_model, os.path.join(cp_path, "maskedDQN_at_0_steps.zip"))
+        cps = ["maskedDQN_at_0_steps.zip"]
+        
+    cp_step_counts = [int(cp.split("_")[2]) for cp in cps]
+    # print("cp_step_counts ",cp_step_counts)
+    # print("max ",max(cp_step_counts))
+    # print("index",cp_step_counts.index(max(cp_step_counts)))
+    max_steps = max(cp_step_counts)
+    most_recent_cp = cps[cp_step_counts.index(max_steps)]
+    
+    args.seed = max_steps + np.random.randint(0, 500)
+    
+    args.attr_model = os.path.join(cp_path, most_recent_cp)
+    args.eval_attr_model = os.path.join(cp_path, most_recent_cp)
+    
+    print(f"starting {np.round(speed_coeff,2)}_{np.round(pos_coeff,2)}_{np.round(steer_coeff,2)} model from checkpoint =>", most_recent_cp)
+    
 
     env = make_vec_env(
         RLCrossingSim,
@@ -68,7 +94,7 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
             "seed": args.seed,
             "basic_model": args.basic_model,
             "attr_model": args.attr_model,
-            "log_path": log_path,
+            "log_path": args.var_log_path,
             "speed_coefficient": speed_coeff,
             "position_coefficient": pos_coeff,
             "steering_coefficient": steer_coeff,
@@ -76,7 +102,7 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
         seed=args.seed,
-        monitor_dir=monitor_path,
+        monitor_dir=args.monitor_path,
     )
     # env = ActionMasker(env, mask_fn)  # Wrap to enable masking
     env.reset()
@@ -93,7 +119,7 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
             "seed": args.eval_seed,
             "basic_model": args.eval_basic_model,
             "attr_model": args.eval_attr_model,
-            "log_path": eval_log_path,
+            "log_path": args.var_eval_log_path,
             "speed_coefficient": speed_coeff,
             "position_coefficient": pos_coeff,
             "steering_coefficient": steer_coeff,
@@ -101,7 +127,7 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
         seed=args.eval_seed,
-        monitor_dir=eval_monitor_path,
+        monitor_dir=args.eval_monitor_path,
     )
 
     model_name = args.exp_log_name.split(os.sep)[-1].split("_")[0]
@@ -111,12 +137,12 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
             clbks.EveryNTimesteps(
                 args.log_interval,
                 CustomTrackingCallback(
-                    monitor_dir=monitor_path,
+                    monitor_dir=args.monitor_path,
                 ),
             ),
             clbks.CheckpointCallback(
                 args.checkpoint_interval,
-                os.path.join(log_path, args.checkpoint_dirname),
+                os.path.join(args.var_log_path, args.checkpoint_dirname),
                 name_prefix=f"{model_name}_at",
                 verbose=args.verbose,
             ),
@@ -131,8 +157,8 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
                 callback_on_new_best=None,
                 n_eval_episodes=args.eval_episodes,
                 eval_freq=args.eval_interval,
-                log_path=log_path,
-                best_model_save_path=os.path.join(eval_log_path, f"{model_name}_best"),
+                log_path=args.var_log_path,
+                best_model_save_path=os.path.join(args.var_eval_log_path, f"{model_name}_best"),
                 render=args.eval_render,
                 verbose=args.eval_verbose,
             ),
@@ -153,30 +179,38 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, args=param_parser.parse_a
     env.envs[0].modelL.learning_starts = 0
     # env.envs[0].modelL.load_replay_buffer(loaded_model.replay_buffer)
     env.envs[0].modelL.exploration_schedule = utils.get_linear_fn(
-        args.exploration_initial_eps,
-        args.exploration_final_eps,
-        args.exploration_fraction,
+        loaded_model.exploration_rate,
+        loaded_model.exploration_final_eps,
+        np.clip(
+            (
+                loaded_model._current_progress_remaining
+                - (1 - loaded_model.exploration_fraction)
+            ),
+            0,
+            1,
+        ),
     )
 
     env.envs[0].modelL.learn(
         total_timesteps=1000 * args.n_episodes,
-        tb_log_name=os.path.join(log_path, "tb_logs"),
+        tb_log_name=os.path.join(args.var_log_path, "tb_logs"),
         callback=callbacks,
         log_interval=args.log_interval / 10,
-        reset_num_timesteps=True,
-        # log_interval=10,
+        reset_num_timesteps=False,
     )
 
-    env.envs[0].modelL.save(os.path.join(log_path, "final_model"), include="env")
+    env.envs[0].modelL.save(os.path.join(args.var_log_path, f"{args.model_name}_final"), include="env")
 
     return env.envs[0].modelL
 
 
 def Main(args=param_parser.parse_args()):
+    
+    
 
     ray.init(num_cpus=args.num_cpus, num_gpus=args.num_gpus)
 
-    output_ids = []
+    output_ids = []        
 
     coeff_map = {
         0: float(1 / 4),
@@ -228,8 +262,9 @@ if __name__ == "__main__":
         args.attr_model = os.path.join(
             os.path.dirname(args.log_path),
             "shaped_reward_agent",
-            "maskedDQN_init_model_480",
+            "maskedDQN_init_model_480.zip",
         )
+        # /home/rawsys/mathgw/term1_22_experiments/logs/shaped_reward_agent/maskedDQN_init_model_480.zip
         # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
 
     if args.eval_attr_model is None:

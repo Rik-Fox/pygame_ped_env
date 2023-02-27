@@ -130,13 +130,14 @@ def Main(args=param_parser.parse_args()):
                     min_evals=int(1e6),
                     verbose=args.eval_verbose,
                 ),
-                callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
-                    reward_threshold=0
-                    # reward_threshold=(
-                    #     eval_env.envs[0].get_max_reward(args.shaped_agent) / 2
-                    # )
-                    # * 0.98
-                ),
+                callback_on_new_best=None,
+                # callback_on_new_best=clbks.StopTrainingOnRewardThreshold(
+                #     reward_threshold=0
+                #     # reward_threshold=(
+                #     #     eval_env.envs[0].get_max_reward(args.shaped_agent) / 2
+                #     # )
+                #     # * 0.98
+                # ),
                 n_eval_episodes=args.eval_episodes,
                 eval_freq=args.eval_interval,
                 log_path=log_path,
@@ -176,7 +177,8 @@ def Main(args=param_parser.parse_args()):
                 1,
             ),
         )
-        total_timesteps = loaded_model._total_timesteps - loaded_model.num_timesteps
+        # total_timesteps = loaded_model._total_timesteps - loaded_model.num_timesteps
+        total_timesteps = 1000 * args.n_episodes
         # tb_log_name = loaded_model.tensorboard_log
         # log_interval = loaded_model.log_interval
         reset_num_timesteps = False
