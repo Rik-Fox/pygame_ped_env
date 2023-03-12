@@ -29,50 +29,6 @@ def mask_fn(env: gym.Env) -> np.ndarray:
 
 
 def Train_variant(speed_coeff, pos_coeff, steer_coeff, gpu_no=0, args=param_parser.parse_args()):
-    
-    args = param_parser.parse_args()
-
-    args.shaped_agent = True
-
-    args.n_episodes = int(5e4)
-
-    # if log path not specificed then set to default outside of code folder
-    if args.log_path is None:
-        wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        args.log_path = os.path.join("/home/rawsys/mathgw", "logs", "shaped_reward_agent_variants")
-
-    if args.basic_model is None:
-        args.basic_model = os.path.join(
-            os.path.dirname(args.log_path),
-            "simple_reward_agent",
-            "maskedDQN_init_model_480",
-        )
-    if args.eval_basic_model is None:
-        args.eval_basic_model = args.basic_model
-
-    if args.attr_model is None:
-        print("No model given, using default untrained model!")
-        args.attr_model = os.path.join(
-            os.path.dirname(args.log_path),
-            "shaped_reward_agent",
-            "maskedDQN_init_model_480.zip",
-        )
-        # /home/rawsys/mathgw/term1_22_experiments/logs/shaped_reward_agent/maskedDQN_init_model_480.zip
-        # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
-
-    if args.eval_attr_model is None:
-        args.eval_attr_model = args.attr_model
-
-    if args.scenarioList is None:
-        args.scenarioList = [0, 1]
-        args.eval_scenarioList = [0, 1]
-
-    args.verbose = 1
-
-    args.exploration_initial_eps = 0.5
-    args.exploration_final_eps = 0.01
-    args.exploration_fraction = 0.25
-    
     args.model_name = (
                     f"{np.round(speed_coeff,2)}_{np.round(pos_coeff,2)}_{np.round(steer_coeff,2)}"
                 )
@@ -249,8 +205,21 @@ def Train_variant(speed_coeff, pos_coeff, steer_coeff, gpu_no=0, args=param_pars
     return env.envs[0].modelL
 
 
-def Main(args=param_parser.parse_args()):     
+def Main(args=param_parser.parse_args()):
+    
+    
+    mp.set_start_method('spawn', force=True)
+    output = []        
 
+    # coeff_map = {
+    #     0: float(1 / 4),
+    #     1: float(1 / 3),
+    #     2: float(1 / 2),
+    #     3: float(1),
+    #     4: float(2),
+    #     5: float(3),
+    #     6: float(4),
+    # }
     coeff_map = {
         # 0: float(1 / 4),
         0: float(1 / 3),
@@ -259,17 +228,67 @@ def Main(args=param_parser.parse_args()):
         3: float(2),
         4: float(3),
         # 6: float(4),
-    }    
-    
-    gpu_no = args.job_no % 3
-    
-    sp = np.floor(args.job_no/25)
-    pos= np.floor((args.job_no % 25)/5)
-    st = (args.job_no % 25) % 5
+    }
+    gpu=0
+    proc_count=0
 
-    Train_variant(coeff_map[sp], coeff_map[pos], coeff_map[st], gpu_no=gpu_no)
+    for k in range(5):
+        for j in range(5):
+            for i in range(5):
+                if (proc_count>1) and (proc_count % 10 == 0): gpu += 1
+                proc = mp.Process(
+                    target=Train_variant, args=(coeff_map[i], coeff_map[j], coeff_map[k], gpu, args)
+                    )
+                proc.start()
+                output.append(proc)
+                proc_count +=1
+    for p in output:
+        p.join()
 
 
 if __name__ == "__main__":
 
-    Main(args=param_parser.parse_args())
+    args = param_parser.parse_args()
+
+    args.shaped_agent = True
+
+    args.n_episodes = int(5e4)
+
+    # if log path not specificed then set to default outside of code folder
+    if args.log_path is None:
+        wkdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        args.log_path = os.path.join(wkdir, "logs", "shaped_reward_agent_variants")
+
+    if args.basic_model is None:
+        args.basic_model = os.path.join(
+            os.path.dirname(args.log_path),
+            "simple_reward_agent",
+            "maskedDQN_init_model_480",
+        )
+    if args.eval_basic_model is None:
+        args.eval_basic_model = args.basic_model
+
+    if args.attr_model is None:
+        print("No model given, using default untrained model!")
+        args.attr_model = os.path.join(
+            os.path.dirname(args.log_path),
+            "shaped_reward_agent",
+            "maskedDQN_init_model_480.zip",
+        )
+        # /home/rawsys/mathgw/term1_22_experiments/logs/shaped_reward_agent/maskedDQN_init_model_480.zip
+        # args.attr_model = "/home/rfox/PhD/Term1_22-23_Experiements/pygame_ped_env/maskedDQN_at_172000000_steps.zip"
+
+    if args.eval_attr_model is None:
+        args.eval_attr_model = args.attr_model
+
+    if args.scenarioList is None:
+        args.scenarioList = [0, 1]
+        args.eval_scenarioList = [0, 1]
+
+    args.verbose = 1
+
+    args.exploration_initial_eps = 0.5
+    args.exploration_final_eps = 0.01
+    args.exploration_fraction = 0.25
+
+    Main(args=args)

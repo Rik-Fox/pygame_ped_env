@@ -36,7 +36,7 @@ param_parser.add_argument("--steering_coefficient", type=float, default=1.0)
 
 # training params
 param_parser.add_argument("--n_episodes", type=int, default=1000000)
-param_parser.add_argument("--n_envs", type=int, default=10)
+param_parser.add_argument("--n_envs", type=int, default=5)
 param_parser.add_argument("--headless", default=True, action="store_false")
 param_parser.add_argument("--render", default=False, action="store_true")
 param_parser.add_argument("--verbose", type=int, default=1)
@@ -109,3 +109,4 @@ param_parser.add_argument(
 
 param_parser.add_argument("--num_cpus", type=int, default=4)
 param_parser.add_argument("--num_gpus", type=int, default=1)
+param_parser.add_argument("--job_no", type=int, default=None)

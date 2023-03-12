@@ -431,20 +431,8 @@ class MaskableDQN(OffPolicyAlgorithm):
             self.lr_schedule,
             **self.policy_kwargs,  # pytype:disable=not-instantiable
         )
-        self.policy = self.policy.to(self.device)
-
         if not isinstance(self.policy, MaskableDQNPolicy):
             raise ValueError("Policy must be MaskableDQNPolicy")
-
-        # self.rollout_buffer = buffer_cls(
-        #     self.n_steps,
-        #     self.observation_space,
-        #     self.action_space,
-        #     self.device,
-        #     gamma=self.gamma,
-        #     gae_lambda=self.gae_lambda,
-        #     n_envs=self.n_envs,
-        # )
 
         self.policy = self.policy.to(self.device)
         super()._setup_model()

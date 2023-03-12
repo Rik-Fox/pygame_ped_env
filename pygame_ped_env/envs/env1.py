@@ -38,6 +38,7 @@ class RLCrossingSim(gym.Env):
         speed_coefficient=1.0,
         position_coefficient=1.0,
         steering_coefficient=1.0,
+        device="cpu"
     ) -> None:
         super().__init__()
         np.random.seed(seed)
@@ -105,6 +106,8 @@ class RLCrossingSim(gym.Env):
         #     pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
         #     self.background = self.generateBackground()
 
+        self.device=device
+        
         self.modelA = self._load_model_from_string(attr_model)
         self.modelB = self._load_model_from_string(basic_model)
 
@@ -728,7 +731,7 @@ class RLCrossingSim(gym.Env):
             raise ValueError("Unknown model type: ", name)
 
         try:
-            return alg.load(path, env=self)
+            return alg.load(path, env=self, device=self.device)
         # if no or wrong model given
         except FileNotFoundError:
             # load default
@@ -736,7 +739,7 @@ class RLCrossingSim(gym.Env):
                 self.parent_log_path, "simple_reward_agent", f"{name}_init_model"
             )
             try:
-                model = alg.load(init_path, env=self)
+                model = alg.load(init_path, env=self, device=self.device)
                 print("No model found, loading default model")
                 print("Loading default model from: ", init_path)
                 return model
@@ -755,7 +758,7 @@ class RLCrossingSim(gym.Env):
                 print("No model found, nor a default model of this algorithm.")
                 print("Created default and saved to: ", init_path)
 
-                return alg.load(init_path, env=self)
+                return alg.load(init_path, env=self, device=self.device)
 
     @staticmethod
     def scenario_map():
