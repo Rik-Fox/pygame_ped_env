@@ -8,7 +8,6 @@ from pygame_ped_env.entities.spritesheet import SpriteSheet, SpriteStripAnim
 
 class Pedestrian(Sprite):
     def __init__(self, x, y, direction, *groups: AbstractGroup, headless=True) -> None:
-
         self.speed = 2
 
         self.headless = headless
@@ -63,7 +62,6 @@ class Pedestrian(Sprite):
         self.image = self._anim[direction].next()
 
     def update(self):
-
         noise = (random.normalvariate(0, 1) * 2) - 1
 
         if self._direction == "right":
@@ -89,9 +87,16 @@ class Pedestrian(Sprite):
 
 class Vehicle(Sprite):
     def __init__(
-        self, x, y, lane, vehicleClass, direction, *groups: AbstractGroup, headless=True
+        self,
+        x,
+        y,
+        lane,
+        vehicleClass,
+        direction,
+        *groups: AbstractGroup,
+        headless=True,
+        colour="orange",
     ):
-
         speeds = {
             "car": 3,
             "bus": 1.8,
@@ -99,21 +104,10 @@ class Vehicle(Sprite):
             "bike": 2.5,
         }  # average speeds of vehicles
 
-        colours = [
-            "blue",
-            "silver",
-            "white",
-            "red",
-            "yellow",
-            "green",
-            "brown",
-            "orange",
-        ]
-
         self.lane_offset = (2 - lane) * 15
         self.vehicleClass = vehicleClass
         self.speed = speeds[vehicleClass]
-        self.colour = random.choice(colours)
+        self.colour = colour
         self.direction = direction
 
         if not headless:

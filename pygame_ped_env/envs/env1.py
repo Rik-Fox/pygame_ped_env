@@ -1,4 +1,5 @@
 import time
+import random
 import pygame
 import sys
 import os
@@ -38,10 +39,10 @@ class RLCrossingSim(gym.Env):
         speed_coefficient=1.0,
         position_coefficient=1.0,
         steering_coefficient=1.0,
-        device="cpu"
+        device="cpu",
     ) -> None:
         super().__init__()
-        np.random.seed(seed)
+        # np.random.seed(seed)
 
         self.log_path = log_path
         self.parent_log_path = os.path.dirname(os.path.dirname(self.log_path))
@@ -106,8 +107,8 @@ class RLCrossingSim(gym.Env):
         #     pygame.display.set_caption("PaAVI - Pedestrian Crossing Simulation")
         #     self.background = self.generateBackground()
 
-        self.device=device
-        
+        self.device = device
+
         self.modelA = self._load_model_from_string(attr_model)
         self.modelB = self._load_model_from_string(basic_model)
 
@@ -217,7 +218,9 @@ class RLCrossingSim(gym.Env):
         horizontal_road.rect.midleft = (0, self.screen_rect.h / 2)
 
     def get_reward(self, agent: RLVehicle):
-        if isinstance(agent.sprite, KeyboardVehicle):
+        if isinstance(agent.sprite, KeyboardVehicle) or isinstance(
+            self.pedestrian, KeyboardPedestrian
+        ):
             done = False
             if pygame.sprite.spritecollide(agent.sprite, self.pedestrian, False):
                 self.done_ped = self.pedestrian.sprite
@@ -487,15 +490,33 @@ class RLCrossingSim(gym.Env):
 
         self.vehicle.empty()
         agent = scenario["agentSprites"][0]
+
+        colours = [
+            "blue",
+            "silver",
+            "white",
+            "red",
+            "yellow",
+            "green",
+            "brown",
+            "orange",
+        ]
+        print(colours)
+        random.seed(time.process_time())
+        c = random.randint(0, 7)
+        print(c)
+        colour = colours[c]
+        print(colour)
+
         if agent[0] == "R":
             agentL = RLVehicle.init_from_scenario(
-                agent, self.screen_rect.size, headless=self.headless
+                agent, self.screen_rect.size, headless=self.headless, colour=colour
             )
             agentL.model = self.modelA
             self.simple_reward = False
         elif agent[0] == "S":
             agentL = RLVehicle.init_from_scenario(
-                agent[1:], self.screen_rect.size, headless=self.headless
+                agent[1:], self.screen_rect.size, headless=self.headless, colour=colour
             )
             agentL.model = self.modelB
             self.simple_reward = True
@@ -509,12 +530,14 @@ class RLCrossingSim(gym.Env):
                         "H_r",
                         f"traj_{np.random.randint(5)}",
                     ),
+                    colour=colour,
                 )
             elif self.H_collect:
                 agentL = KeyboardVehicle.init_from_scenario(
                     agent,
                     self.screen_rect.size,
                     load_path=None,
+                    colour=colour,
                 )
             else:
                 agentL = KeyboardVehicle.init_from_scenario(
@@ -525,6 +548,7 @@ class RLCrossingSim(gym.Env):
                         self.scenarioName,
                         f"traj_{np.random.randint(5)}",
                     ),
+                    colour=colour,
                 )
 
             agentL.model = None

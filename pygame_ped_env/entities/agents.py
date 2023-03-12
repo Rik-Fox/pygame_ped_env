@@ -39,6 +39,7 @@ class RLVehicle(Vehicle):
         direction: str,
         *groups: AbstractGroup,
         headless=True,
+        colour=None,
     ) -> None:
         if direction == "right":
             start = [0, window_size[1] / 2]
@@ -50,9 +51,30 @@ class RLVehicle(Vehicle):
             raise AttributeError(
                 'Only "left" and "right" directions are implemented for vehicles'
             )
+        colours = [
+            "blue",
+            "silver",
+            "white",
+            "red",
+            "yellow",
+            "green",
+            "brown",
+            "orange",
+        ]
+        if colour is None:
+            colour = np.random.choice(colours)
+        else:
+            pass
 
         super().__init__(
-            start[0], start[1], 2, vehicleClass, direction, *groups, headless=headless
+            start[0],
+            start[1],
+            2,
+            vehicleClass,
+            direction,
+            *groups,
+            headless=headless,
+            colour=colour,
         )
         if direction == "right":
             self.rect.midleft += np.array(self.rect.size[0])
@@ -108,7 +130,11 @@ class RLVehicle(Vehicle):
             self.rect.center += np.array([-1, 0])  # just move left
 
     def save(self, file):
-        self.model.save(file.split(".")[0])
+        try:
+            self.model.save(file.split(".")[0])
+        except:
+            pass
+
         save_dict = {
             "direction": self.direction,
             "colour": self.colour,
@@ -135,10 +161,22 @@ class RLVehicle(Vehicle):
         cls, scenario: str, window_size, *groups: AbstractGroup, **kwargs
     ):
         if scenario == ("RL_left" or "SRL_left"):
-            return cls(window_size, "car", "left", *groups, headless=kwargs["headless"])
+            return cls(
+                window_size,
+                "car",
+                "left",
+                *groups,
+                headless=kwargs["headless"],
+                colour=kwargs["colour"],
+            )
         else:
             return cls(
-                window_size, "car", "right", *groups, headless=kwargs["headless"]
+                window_size,
+                "car",
+                "right",
+                *groups,
+                headless=kwargs["headless"],
+                colour=kwargs["colour"],
             )
 
 
@@ -201,6 +239,7 @@ class KeyboardVehicle(Vehicle):
         vehicleClass: str,
         direction: str,
         load_path=None,
+        colour=None,
         *groups: AbstractGroup,
     ) -> None:
         self.direction = direction
@@ -215,8 +254,30 @@ class KeyboardVehicle(Vehicle):
                 'Only "left" and "right" directions are implemented for vehicles'
             )
 
+        colours = [
+            "blue",
+            "silver",
+            "white",
+            "red",
+            "yellow",
+            "green",
+            "brown",
+            "orange",
+        ]
+        if colour is None:
+            colour = np.random.choice(colours)
+        else:
+            pass
+
         super().__init__(
-            start[0], start[1], 2, vehicleClass, direction, *groups, headless=False
+            start[0],
+            start[1],
+            2,
+            vehicleClass,
+            direction,
+            *groups,
+            headless=False,
+            colour=colour,
         )
         self.rect.x += start_offset
         self.init_pos = [self.rect.x, self.rect.y]
@@ -300,7 +361,7 @@ class KeyboardVehicle(Vehicle):
         with open(file, "rb") as filePath:
             load_dict = pickle.load(filePath)
         self.direction = load_dict["direction"]
-        self.colour = load_dict["colour"]
+        # self.colour = load_dict["colour"]
         self.moved = load_dict["moved"]
         self.replay = True
 
